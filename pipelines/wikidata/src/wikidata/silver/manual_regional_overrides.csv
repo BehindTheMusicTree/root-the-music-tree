@@ -470,3 +470,131 @@ Q111540535,cantautor music,"root item with no P279/P361 parent; Hispanic singer-
 Q107718509,Hispanic music,"root item with no P279/P361 parent; broad umbrella with no single national home, promoted to its own synthetic regional overview per user request",LOCAL:hispanic-world
 Q1716019,Jewish music,"root item with no P279/P361 parent; broad umbrella with no single national home, promoted to its own synthetic regional overview per user request",LOCAL:jewish-tradition-music
 Q107024992,ancient Levitical music,"root item with no P279/P361 parent; ancient Temple-era Jewish liturgical music, nested under the existing synthetic Jewish-liturgical overview",LOCAL:jewish-liturgical-music
+Q11907705,Ball de bot,"root item with no P279/P361 parent; traditional Catalan/Balearic folk dance, nested under Catalonia per user disambiguation",Q3808055
+Q16497280,batuque,"root item with no P279/P361 parent; Wikidata confirms country of origin Brazil (""Afro-Brazilian dances accompanied by percussion""), distinct from the separate Cape Verdean batuku tradition",Q899215
+Q3978155,suri sicuri,"root item with no P279/P361 parent; Wikidata lists country of origin as both Bolivia and Peru (genuinely cross-national Andean panpipe tradition), nested under the existing synthetic Andean overview per user request",LOCAL:andean-music
+Q17598653,kitchen song,"root item with no P279/P361 parent; confirmed via web research as a Newfoundland/Canadian-Maritime kitchen-party folk tradition, not Scottish or Irish specifically",Q6942214
+Q13037709,Borrohite,root item with no P279/P361 parent; Albanian shepherd funeral song tradition confirmed via web research,Q1075799
+Q21064844,Hako,"root item with no P279/P361 parent; Wikidata confirms country of origin Chile, subclass of war dance",Q3889385
+Q12825187,Kor,root item with no P279/P361 parent; Wikidata confirms part of the culture of Uzbekistan per the National Encyclopedia of Uzbekistan,Q3328738
+Q107641917,Laku,"root item with no P279/P361 parent; Wikidata confirms country of origin Suriname (""Surinamese dance and music style"")",Q6942295
+Q138388459,la danse Falé,root item with no P279/P361 parent; Wikidata confirms country of origin Mali,Q10334890
+Q130660185,New Partisans,"root item with no P279/P361 parent; 1980s Yugoslav music movement, subclass of ""popular music in Yugoslavia"" which never got its own item row in the tree, so nested under the national overview instead",Q1522794
+Q3981262,Tasgia,"root item with no P279/P361 parent; polyphonic singing system specific to upper Gallura, Sardinia, subclass of ""polyphony"" which never got its own item row in the tree, so nested under the more specific Sardinia overview instead of Italy",Q6942263
+Q5821609,costillar,"root item with no P279/P361 parent; confirmed via web research as a Chiloé, Chile folk dance (bottle-circling dance)",Q3889385
+Q724010,Ashiqs of Azerbaijan,root item with no P279/P361 parent; Azerbaijani bardic singing tradition,Q724104
+Q2881396,Ballu tundu,root item with no P279/P361 parent; Sardinian dance tradition,Q6942263
+Q115632116,Batuque de Umbigada,root item with no P279/P361 parent; Brazilian belly-bump dance tradition,Q899215
+Q4897056,Beste,root item with no P279/P361 parent; Ottoman/Turkish classical vocal form,Q1074080
+Q2741465,Calinda,root item with no P279/P361 parent; Trinidadian stick-fighting song/dance tradition,Q6942303
+Q5031532,Canción mexicana,root item with no P279/P361 parent; Mexican song genre,Q3397325
+Q12385250,Carballesa,root item with no P279/P361 parent; Galician traditional dance,Q10334896
+Q2668052,Dutch-language music,root item with no P279/P361 parent; genre defined by Dutch-language lyrics,Q377185
+Q1046920,Dōjin music,root item with no P279/P361 parent; Japanese fan-made/independent music scene,Q257533
+Q1942905,Geuzen song,root item with no P279/P361 parent; 16th-century Dutch Beggars (Geuzen) song tradition,Q377185
+Q1915787,H8000,"root item with no P279/P361 parent; Kortrijk, Belgium hardcore punk scene",Q2587471
+Q127472147,Hindi music,root item with no P279/P361 parent; genre defined by Hindi-language lyrics,Q531426
+Q16154635,Kabarett,root item with no P279/P361 parent; German cabaret song tradition,Q2743758
+Q6351763,Kalbelia,root item with no P279/P361 parent; Rajasthani (India) folk music/dance tradition,Q531426
+Q109470684,Kanshū,root item with no P279/P361 parent; Japanese rakugo-tradition term,Q257533
+Q3192842,Kapa haka,root item with no P279/P361 parent; Māori performing-arts tradition,Q6942216
+Q3656514,Milanese song,root item with no P279/P361 parent; song genre in the Milanese dialect,Q3679098
+Q109470683,Péilú,root item with no P279/P361 parent; Japanese rakugo-tradition term,Q257533
+Q109470688,Ringa,root item with no P279/P361 parent; Japanese rakugo-tradition term,Q257533
+Q109470687,Senshuraku,root item with no P279/P361 parent; Japanese rakugo-tradition term,Q257533
+Q109470685,Torika,root item with no P279/P361 parent; Japanese rakugo-tradition term,Q257533
+Q109470686,so gōkō,root item with no P279/P361 parent; Japanese rakugo-tradition term,Q257533
+Q13118900,Powada,root item with no P279/P361 parent; Marathi (India) ballad tradition,Q531426
+Q6093230,Punto guanacasteco,root item with no P279/P361 parent; Costa Rican national dance/song,Q17080863
+Q12154808,Ukrainian social household song,root item with no P279/P361 parent; Ukrainian domestic folk-song tradition,Q155858
+Q19899689,Rebita,root item with no P279/P361 parent; Greek rebetiko-adjacent dance/song form,Q1465419
+Q3487087,Smyrneiko,root item with no P279/P361 parent; Greek (Smyrna-style) rebetiko genre,Q1465419
+Q12338430,Sønderhoning,root item with no P279/P361 parent; Danish (Sønderho) folk dance tradition,Q2449418
+Q10378015,Tambor de Crioula,root item with no P279/P361 parent; Brazilian (Maranhão) Afro-Brazilian tradition,Q899215
+Q6147820,Tocotín,root item with no P279/P361 parent; Mexican colonial-era dance/song tradition,Q3397325
+Q5655239,abozao,root item with no P279/P361 parent; Panamanian dance/genre,Q6942240
+Q3631657,aṣíkò,root item with no P279/P361 parent; Yoruba (Nigeria) music genre,Q2738838
+Q15720097,bhavageete,root item with no P279/P361 parent; Kannada (India) devotional/lyrical poetry set to music,Q531426
+Q120403952,bulería of Jerez de la Frontera,"root item with no P279/P361 parent; flamenco palo specific to Jerez, Spain",Q964987
+Q9668561,bumba meu boi do Maranhão,root item with no P279/P361 parent; Brazilian (Maranhão) folk tradition,Q899215
+Q18466722,cacuriá,root item with no P279/P361 parent; Brazilian (Maranhão) folk dance,Q899215
+Q20102893,cançó de croada,root item with no P279/P361 parent; Catalan song tradition,Q3808055
+Q508790,chastushka,root item with no P279/P361 parent; Russian short humorous folk verse-song,Q2498201
+Q5116136,chumaichada,root item with no P279/P361 parent; Galician traditional dance,Q10334896
+Q5793032,cuándo,root item with no P279/P361 parent; Argentine folk dance,Q645992
+Q5221793,dappankuthu,root item with no P279/P361 parent; Tamil Nadu (India) dance-music genre,Q531426
+Q985135,giddha,root item with no P279/P361 parent; Punjabi (India) folk dance/song,Q531426
+Q2249365,kawina,root item with no P279/P361 parent; Afro-Surinamese music genre,Q6942295
+Q25624527,luddi,root item with no P279/P361 parent; Punjabi (India) folk dance,Q531426
+Q5799202,machetero,root item with no P279/P361 parent; Bolivian folk dance,Q3328603
+Q1423598,mapalé,root item with no P279/P361 parent; Afro-Colombian dance genre,Q920883
+Q1262697,mento,root item with no P279/P361 parent; Jamaican folk music genre,Q572717
+Q12399034,muiñeira vella,root item with no P279/P361 parent; Galician traditional dance,Q10334896
+Q20492204,music in Catalan language,root item with no P279/P361 parent; genre defined by Catalan-language lyrics,Q3808055
+Q138327511,nat thachin,root item with no P279/P361 parent; Burmese (Myanmar) traditional song genre,Q3328602
+Q6066199,patacoré,root item with no P279/P361 parent; Afro-Colombian (Chocó) dance genre,Q920883
+Q6126881,shaqapas,root item with no P279/P361 parent; Bolivian (Aymara) dance genre,Q3328603
+Q6129485,sirilla,root item with no P279/P361 parent; Bolivian dance genre,Q3328603
+Q100330639,steel drum music,root item with no P279/P361 parent; Trinidadian steelpan music tradition,Q6942303
+Q3529199,tinku,root item with no P279/P361 parent; Bolivian ritual dance,Q3328603
+Q97097034,tirana,root item with no P279/P361 parent; Spanish (flamenco-adjacent) song form,Q964987
+Q65212418,Pandero song,root item with no P279/P361 parent; Puerto Rican pandero-driven music tradition,Q427183
+Q5676196,Pandilla Punoan,root item with no P279/P361 parent; Peruvian (Puno) dance genre,Q3085344
+Q7259146,Pukllay,root item with no P279/P361 parent; Peruvian Andean carnival dance,Q3085344
+Q136946883,Wapululos de Lampa,root item with no P279/P361 parent; Peruvian (Lampa) dance genre,Q3085344
+Q12849794,Şərqi,root item with no P279/P361 parent; traditional Azerbaijani song genre,Q724104
+Q2494949,Gato,root item with no P279/P361 parent; Argentine folk dance,Q645992
+Q5479290,Gato cuyano,root item with no P279/P361 parent; Argentine (Cuyo region) folk dance,Q645992
+Q5401205,Zamba alegre,root item with no P279/P361 parent; Argentine folk dance,Q645992
+Q20656222,galopa misionera,root item with no P279/P361 parent; Argentine (Misiones) folk genre,Q645992
+Q6152936,triunfo,root item with no P279/P361 parent; Argentine/Andean folk dance,Q645992
+Q5529320,Gbedu (drum),root item with no P279/P361 parent; Yoruba (Nigeria) drum/music tradition,Q2738838
+Q3835724,Llamerada,root item with no P279/P361 parent; Bolivian (Oruro carnival) llama-themed dance,Q3328603
+Q8774180,El vito,root item with no P279/P361 parent; Andalusian (Spain) traditional dance/song,Q964987
+Q105337573,set-dansi,root item with no P279/P361 parent; Faroese set-dance tradition,Q6942371
+Q3562031,voceru,root item with no P279/P361 parent; Corsican funeral lament tradition,Q2378916
+Q631621,bertsolaritza,root item with no P279/P361 parent; Basque improvised sung-verse tradition,LOCAL:basque-country
+Q2635155,Ahidus,"root item with no P279/P361 parent; Amazigh (Berber, Morocco) collective dance-music tradition",Q2346484
+Q15306187,Corrido,root item with no P279/P361 parent; Mexican narrative ballad genre,Q3397325
+Q25705473,New Year's kalanta,root item with no P279/P361 parent; Greek New Year carol tradition,Q1465419
+Q11395595,debayashi in rakugo,root item with no P279/P361 parent; Japanese rakugo entrance-music genre,Q257533
+Q11660625,densha shōka,root item with no P279/P361 parent; Japanese train-jingle song genre,Q257533
+Q11410949,classic rakugo,root item with no P279/P361 parent; Japanese rakugo performance tradition,Q257533
+Q2036172,pizzica,root item with no P279/P361 parent; Italian (Salento) tarantella-family dance,Q3679098
+Q106560670,suri sicuri (Bolivia),root item with no P279/P361 parent; Bolivia-specific panpipe tradition (label explicitly names the country),Q3328603
+Q324617,tarantella,root item with no P279/P361 parent; Italian folk dance genre,Q3679098
+Q1245536,tuna,root item with no P279/P361 parent; Spanish/Iberian student musical-group tradition,Q964987
+Q16119301,al-hawizi maqam,root item with no P279/P361 parent; Iraqi maqam tradition,Q3328692
+Q373982,logobi,root item with no P279/P361 parent; Ivorian (Cote d'Ivoire) dance-music genre,Q3328693
+Q355247,strathspey,root item with no P279/P361 parent; Scottish dance/tune tradition,Q1048469
+Q133837227,American classical guitar music,root item with no P279/P361 parent; United States classical guitar tradition,Q2267955
+Q141236774,Tame (dansa),"root item with no P279/P361 parent; Wikidata label is missing (displays as bare QID) but WebFetch confirmed real content: Niuean folk dance/music genre ""Tame"" imported from Catalan Wikipedia",Q14548294
+Q107414578,Tuka,root item with no P279/P361 parent; a Surinamese genre missed by the automated seed/indigenous_to/country_of_origin classification,Q6942295
+Q107414547,Maraca,root item with no P279/P361 parent; a Surinamese genre missed by the automated seed/indigenous_to/country_of_origin classification,Q6942295
+Q12257012,Eresiak,"root item with no P279/P361 parent; Basque dirge tradition, more precisely Basque than Spanish so targets the Basque Country overview",LOCAL:basque-country
+Q104870123,Bantu music,"root item with no P279/P361 parent; pan-African ethnolinguistic grouping with no single national/ethnic home, targets the broad Africa overview",Q369820
+Q140285794,Saami-language music,"root item with no P279/P361 parent; Sami tradition spans Norway/Sweden/Finland/Russia with no single national home, targets the Nordic-countries overview",Q26302245
+Q12111341,Cossack song,"root item with no P279/P361 parent; subclass of Slavic folk song, best-documented/UNESCO-recognized tradition is Ukrainian Cossack song",Q155858
+Q137544146,Fife music,"root item with no P279/P361 parent; Wikidata scopes it to the Historical Carnival of Ivrea, an Italian (Piedmontese) tradition",Q3679098
+Q1775526,Contradanza,"root item with no P279/P361 parent; pan-Hispanic dance tradition (Spain, Cuba, Puerto Rico, Dominican Republic, Mexico) with no single national home, targets the Hispanic-world overview per user direction",LOCAL:hispanic-world
+Q2069651,Kolomyjka,root item with no P279/P361 parent; a Ukrainian folk dance/music genre missed by the automated classification,Q155858
+Q17049926,Q'axilu,root item with no P279/P361 parent; a Peruvian indigenous dance/music genre,Q3085344
+Q106527826,Sekete,root item with no P279/P361 parent; a Surinamese dance/music genre,Q6942295
+Q5707612,arunguita,root item with no P279/P361 parent; an Argentine folk dance/music genre,Q645992
+Q1818108,chakroelo,"root item with no P279/P361 parent; this is Chakrulo, a UNESCO-recognized Georgian polyphonic folk song",Q2032053
+Q125923060,charrasquiño,root item with no P279/P361 parent; a Galician (Spain) music and dance form,Q964987
+Q8457821,cielito,root item with no P279/P361 parent; a traditional Argentine (and Uruguayan) folk dance/music genre,Q645992
+Q5581134,gombhira,root item with no P279/P361 parent; a Bengali comedic folk song genre originating in Bangladesh,Q3328593
+Q7724724,kaboela,root item with no P279/P361 parent; a Surinamese music and dance style,Q6942295
+Q6025503,mozo danza,root item with no P279/P361 parent; a Peruvian folk dance/music genre,Q3085344
+Q6057482,pala pala,root item with no P279/P361 parent; a dance/music genre from the Argentine Northwest,Q645992
+Q6058911,palito,root item with no P279/P361 parent; an Argentine folk dance/music genre,Q645992
+Q6103404,refalosa,root item with no P279/P361 parent; a South American folk dance/music genre with stated country of origin Peru,Q3085344
+Q6108923,rin,root item with no P279/P361 parent; a Chilean music genre and dance type,Q3889385
+Q2797513,sainaimu,"root item with no P279/P361 parent; also known as sanam/senem, a folk dance/music genre with country of origin China",Q277393
+Q2748579,Čoček,root item with no P279/P361 parent; a Balkan (Ottoman-era/Romani) musical genre and dance not tied to one modern nation,Q3211884
+Q15623112,Zapateado,root item with no P279/P361 parent; an Andalusian Spanish traditional dance and music style,Q964987
+Q99640582,mining brass band,root item with no P279/P361 parent; a British colliery brass-band tradition (England/Wales),Q268673
+Q3328797,musique actuelle,"root item with no P279/P361 parent; a Quebec-originated (Montreal, FIMAV) avant-garde/experimental music movement",Q6942037
+Q10690617,tango waltz,"root item with no P279/P361 parent; subclass of waltz, but this is the Argentine/Uruguayan tango-adjacent vals criollo style",Q645992
+Q123139242,two step,root item with no P279/P361 parent; a ragtime-era American composed dance-music form (waltz/ragtime themselves are flagged regional so can't serve as canonical parent),Q2267955
