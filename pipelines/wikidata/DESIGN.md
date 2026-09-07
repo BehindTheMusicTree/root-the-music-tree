@@ -8,6 +8,8 @@ pipeline. See [SCHEMA.md](SCHEMA.md) for column definitions and data profiles.
 - [Design](#design)
   - [Table of Contents](#table-of-contents)
   - [Bronze](#bronze)
+    - [wikidata_genre_tree.parquet](#wikidata_genre_treeparquet)
+    - [wikidata_genre_indigenous_to.parquet and wikidata_genre_country_of_origin.parquet](#wikidata_genre_indigenous_toparquet-and-wikidata_genre_country_of_originparquet)
   - [Silver](#silver)
     - [2_regional_overview_classification](#2_regional_overview_classification)
     - [3_regional_classification](#3_regional_classification)
@@ -15,6 +17,11 @@ pipeline. See [SCHEMA.md](SCHEMA.md) for column definitions and data profiles.
     - [5_hierarchy](#5_hierarchy)
 
 ## Bronze
+
+Three queries, three Parquet files — see [SCHEMA.md#bronze](SCHEMA.md#bronze) for their column
+definitions and data profiles.
+
+### wikidata_genre_tree.parquet
 
 **Why `P31`, not a `P279*` walk from `Q188451`:** the intuitive query — "every item transitively
 `P279` subclass-of music genre" — returns only 14 items (verified live), mostly _meta-categories_
@@ -55,7 +62,22 @@ below.
 **Deliberate deviation from the raw query response**: Wikidata's SPARQL results return full
 entity URIs (`http://www.wikidata.org/entity/Q11399`), not bare QIDs — `ingest.py`
 strips the `http://www.wikidata.org/entity/` prefix before writing Parquet, since the QID is the
-natural join key and the full URI is otherwise dead weight. Labels are passed through as-is.
+natural join key and the full URI is otherwise dead weight. Labels are passed through as-is. This
+applies to all three Bronze queries, not just this one.
+
+### wikidata_genre_indigenous_to.parquet and wikidata_genre_country_of_origin.parquet
+
+**Why separate tables, not extra columns on `wikidata_genre_tree.parquet`:** `P2341` ("indigenous
+to") and `P495` ("country of origin") are per-item ethnographic/provenance attributes, not
+genre-to-genre taxonomy edges like `P279`/`P361`, and their cardinality is independent of an item's
+parent count — an item can have any number of `P279`/`P361` parents and, separately, any number of
+`P2341` or `P495` values. Querying either alongside `P279`/`P361` in a single row (the way
+`GENRE_TREE_QUERY` handles `P279`/`P361` together, since those share the same "parent edge"
+semantics) would cross-multiply the extra `OPTIONAL` into spurious combinations — e.g. an item with
+2 parents and 3 `P2341` values would produce 6 rows instead of 2 + 3. Each is therefore its own
+query, producing its own (item, value) table. See `wikidata_client.INDIGENOUS_TO_QUERY` /
+`COUNTRY_OF_ORIGIN_QUERY`, and [3_regional_classification](#3_regional_classification) below for
+how each is used downstream.
 
 ## Silver
 
