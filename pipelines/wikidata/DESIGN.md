@@ -8,10 +8,11 @@ pipeline. See [SCHEMA.md](SCHEMA.md) for column definitions and data profiles.
 - [Design](#design)
   - [Table of Contents](#table-of-contents)
   - [Bronze](#bronze)
-  - [2_regional_overview_classification](#2_regional_overview_classification)
-  - [3_regional_classification](#3_regional_classification)
-  - [4_genre_parents](#4_genre_parents)
-  - [5_hierarchy](#5_hierarchy)
+  - [Silver](#silver)
+    - [2_regional_overview_classification](#2_regional_overview_classification)
+    - [3_regional_classification](#3_regional_classification)
+    - [4_genre_parents](#4_genre_parents)
+    - [5_hierarchy](#5_hierarchy)
 
 ## Bronze
 
@@ -56,7 +57,9 @@ entity URIs (`http://www.wikidata.org/entity/Q11399`), not bare QIDs — `ingest
 strips the `http://www.wikidata.org/entity/` prefix before writing Parquet, since the QID is the
 natural join key and the full URI is otherwise dead weight. Labels are passed through as-is.
 
-## 2_regional_overview_classification
+## Silver
+
+### 2_regional_overview_classification
 
 **Why classification is needed:** Wikidata's `P31` "instance of" `Q188451` ("music genre") class
 extension — Bronze's source query — is noisy. It includes items that are not themselves musical
@@ -117,7 +120,7 @@ forms/techniques like "fugue" or "polyphony", ensemble/format labels like "big b
 aren't covered here yet — they don't reduce to one clean, false-positive-free rule the way
 `regional_overview` does, and are left for a later Silver step.
 
-## 3_regional_classification
+### 3_regional_classification
 
 `3_regional_classification` also reads Bronze `wikidata_genre_indigenous_to.parquet` (see
 [SCHEMA.md#bronze](SCHEMA.md#bronze)) to catch nationally/ethnically-specific genres that have no
@@ -191,7 +194,7 @@ reaches regional status via an already-flagged parent that isn't itself a seed.
 > investigation into why Wikidata's own query misses it (wrong assumed label, different
 > instance-of class, etc.) rather than being treated as a non-issue.
 
-## 4_genre_parents
+### 4_genre_parents
 
 Before the `parent_is_genre` flag is computed, this step also reads a git-tracked, hand-curated
 `manual_canonical_parents.csv` (columns: `item_id`, `item_label`, `reason`, `parent_item_id`) and
@@ -217,7 +220,7 @@ Tanzania") and a parent that was never in Bronze's `P31` "music genre" extension
 "national song" → "national anthem", "Renaissance music" → "Renaissance art") — both count as
 `parent_is_genre = false` under the rule above.
 
-## 5_hierarchy
+### 5_hierarchy
 
 `5_hierarchy.parquet` (canonical) and `5_regional_hierarchy.parquet` (regional) are the first
 Silver step that actually prunes rather than flags: it reduces `4_genre_parents.parquet` to one
