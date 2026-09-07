@@ -65,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Documentation
 
 - `.claude/skills/wikidata-canonical-roots/SKILL.md`: aligned the phantom-parent triage notes with the `_prune_canonical` orphan-recovery fix above — most non-genre-only-parent items now surface as roots directly at step 5 instead of leaving a dangling phantom pointer for step 6 to catch, and "popular music" is no longer cited as a phantom-parent example since it's excluded outright.
+- Split `pipelines/wikidata/SCHEMA.md` (581 lines, drifted into rationale/rules content) into a pure columns-only data dictionary plus a new `pipelines/wikidata/DESIGN.md` for the classification rules, manual-CSV curation mechanics, and provisional/exploration-phase callouts — matching `pipelines/musicbrainz/SCHEMA.md`'s columns-only shape. `CONTRIBUTING.md`/`CLAUDE.md` now document this SCHEMA.md-vs-DESIGN.md split as a repo convention. Prefixed every section/subsection heading in both wikidata docs and `pipelines/musicbrainz/SCHEMA.md` with hierarchical numbers (`1`, `1.1`, `2.2.1`, ...) for easy reference, updating every cross-reference (READMEs, `CLAUDE.md`, the wikidata exploration notebook, code comments) to the resulting anchors.
 
 ## [0.1.3] - 2026-08-28
 
