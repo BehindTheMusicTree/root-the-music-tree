@@ -22,7 +22,7 @@ Wikidata's music genre taxonomy (`P279` "subclass of" and `P361` "part of", root
 ## Overview
 
 - **Source:** the public Wikidata SPARQL endpoint (`https://query.wikidata.org/sparql`), queried live — no local dump or database.
-- **Root query:** every Wikidata item classified `P31` ("instance of") `Q188451` ("music genre") — not a `P279` transitive walk from `Q188451`, which finds only ~14 meta-category items and misses nearly every real genre (see [SCHEMA.md](SCHEMA.md) for why).
+- **Root query:** every Wikidata item classified `P31` ("instance of") `Q188451` ("music genre") — not a `P279` transitive walk from `Q188451`, which finds only ~14 meta-category items and misses nearly every real genre (see [DESIGN.md#bronze](DESIGN.md#bronze) for why).
 - **Bronze:** each of those genre items, plus its direct `P279` ("subclass of") and `P361` ("part of") parent edge(s), written as-is.
 - **Silver:** six sequential steps refine Bronze into canonical and regional genre hierarchies:
   1. `1_item_links` — derives a browsable Wikidata page URL (`item_url`/`parent_url`) from each row's `item_id`/`parent_id`.
@@ -51,7 +51,7 @@ The target shape is **two distinct trees**:
   The regional follows a **different logic**: one root per **cultural/geographic region**, with that region’s specific genres nested beneath it.
   _Example_: A root like "West Africa" could include sub-genres such as "Afrobeat," "Highlife," or "Mbalax."
 
-See [SCHEMA.md#5_hierarchy](SCHEMA.md#5_hierarchy)'s "Under exploration" callout.
+See [DESIGN.md#5_hierarchy](DESIGN.md#5_hierarchy)'s "Under exploration" callout.
 
 ## Pipeline
 
@@ -62,12 +62,13 @@ See [SCHEMA.md#5_hierarchy](SCHEMA.md#5_hierarchy)'s "Under exploration" callout
 | Silver | `2_regional_overview_classification` | Classifies Bronze edges with `is_regional_overview` and `classification_reason`, tagging items such as "music of Kenya" as regional_overview                                                                                              |
 | Silver | `3_regional_classification`          | Adds `is_regional`/`regional_reason`, cascading regional status (e.g. "morna", "fado") from `regional_overview` seeds, which are themselves marked `is_regional`/`seed`                                                                    |
 | Silver | `4_genre_parents`                    | Adds `parent_is_genre`, identifying edges whose parent isn't itself an actual musical style                                                                                                                                                 |
-| Silver | `5_hierarchy`                        | Prunes to two clean, one-parent-per-item edge lists — canonical (`5_hierarchy.parquet`) and regional (`5_regional_hierarchy.parquet`) — with a provisional lowest-QID heuristic for multi-parent items — see [SCHEMA.md](SCHEMA.md#silver) |
-| Silver | `6_canonical_roots`                  | Filters `5_hierarchy.parquet` to root items (no parent), for manual exploration of the "too many roots" open question — see [SCHEMA.md](SCHEMA.md#silver)                                                                                  |
+| Silver | `5_hierarchy`                        | Prunes to two clean, one-parent-per-item edge lists — canonical (`5_hierarchy.parquet`) and regional (`5_regional_hierarchy.parquet`) — with a provisional lowest-QID heuristic for multi-parent items — see [DESIGN.md#5_hierarchy](DESIGN.md#5_hierarchy) |
+| Silver | `6_canonical_roots`                  | Filters `5_hierarchy.parquet` to root items (no parent), for manual exploration of the "too many roots" open question — see [DESIGN.md#5_hierarchy](DESIGN.md#5_hierarchy)                                                                                  |
 
 ## Schema
 
-See [SCHEMA.md](SCHEMA.md) for the data dictionary and lineage notes.
+See [SCHEMA.md](SCHEMA.md) for the data dictionary and lineage notes, and [DESIGN.md](DESIGN.md)
+for the rationale, classification rules, and manual-CSV curation mechanics behind each Silver step.
 
 ## Setup
 

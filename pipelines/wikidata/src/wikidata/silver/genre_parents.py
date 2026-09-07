@@ -15,7 +15,7 @@ WIKIDATA_ITEM_URL_PREFIX = "https://www.wikidata.org/wiki/"
 # this does not affect is_regional/regional_reason — it only supplies a missing canonical parent
 # edge. `parent_item_id` must reference another genre item already in the tree (not a
 # `is_regional_overview` item — that's what manual_regional_overrides.csv is for).
-# See SCHEMA.md#4_genre_parents.
+# See DESIGN.md#4_genre_parents.
 MANUAL_CANONICAL_PARENTS_PATH = Path(__file__).parent / "manual_canonical_parents.csv"
 
 

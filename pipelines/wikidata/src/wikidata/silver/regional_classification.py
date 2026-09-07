@@ -15,7 +15,7 @@ WIKIDATA_ITEM_URL_PREFIX = "https://www.wikidata.org/wiki/"
 # Japan" — normally a real QID, but may be a synthetic `LOCAL:` id, see regional_overview_classification.py)
 # the override item nests under in 5_regional_hierarchy — required, since these override items
 # typically have no P279/P361 parent and would otherwise surface as their own orphan root in the
-# regional tree instead of sitting under their region. See SCHEMA.md#3_regional_classification.
+# regional tree instead of sitting under their region. See DESIGN.md#3_regional_classification.
 MANUAL_OVERRIDES_PATH = Path(__file__).parent / "manual_regional_overrides.csv"
 
 
