@@ -3,6 +3,8 @@ from pathlib import Path
 
 import polars as pl
 
+from wikidata.silver.regional_overview_classification import MANUAL_OVERVIEW_RECLASSIFICATION_REASON
+
 logger = logging.getLogger(__name__)
 
 WIKIDATA_ITEM_URL_PREFIX = "https://www.wikidata.org/wiki/"
@@ -121,7 +123,7 @@ def classify_regional_genres(
     # with a parent edge into an already-regional item is "inherited" regional, repeated until no new
     # items are found.
     seed_ids = set(
-        df.filter(pl.col("classification_reason").is_in(["regional_overview", "manual_overview_reclassification"]))
+        df.filter(pl.col("classification_reason").is_in(["regional_overview", MANUAL_OVERVIEW_RECLASSIFICATION_REASON]))
         .select("item_id")
         .unique()
         .to_series()
