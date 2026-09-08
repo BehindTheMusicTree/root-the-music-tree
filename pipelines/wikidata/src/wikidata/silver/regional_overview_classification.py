@@ -207,14 +207,15 @@ def classify_regional_from_overviews(
         df, pl.read_csv(reclassifications_path, schema_overrides=manual_additions_schema)
     )
 
+    reclass_ids_list = sorted(reclass_ids)
     is_regional_overview = pl.col("item_label").str.starts_with(REGIONAL_OVERVIEW_PREFIX) | pl.col("item_id").is_in(
-        list(reclass_ids)
+        reclass_ids_list
     )
     df = df.with_columns(
         is_regional_overview=is_regional_overview,
         classification_reason=pl.when(pl.col("item_label").str.starts_with(REGIONAL_OVERVIEW_PREFIX))
         .then(pl.lit("regional_overview"))
-        .when(pl.col("item_id").is_in(list(reclass_ids)))
+        .when(pl.col("item_id").is_in(reclass_ids_list))
         .then(pl.lit(MANUAL_OVERVIEW_RECLASSIFICATION_REASON))
         .otherwise(None),
     )
