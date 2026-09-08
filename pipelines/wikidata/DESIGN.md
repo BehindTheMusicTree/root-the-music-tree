@@ -24,7 +24,7 @@ pipeline. See [SCHEMA.md](SCHEMA.md) for column definitions and data profiles.
       - [2.1.6 Scope of this first pass](#216-scope-of-this-first-pass)
     - [2.2 3_regional_classification](#22-3_regional_classification)
       - [2.2.1 Inputs](#221-inputs)
-      - [2.2.2 Rule: three seed sources](#222-rule-three-seed-sources)
+      - [2.2.2 Rule: four seed sources](#222-rule-four-seed-sources)
       - [2.2.3 Cascade](#223-cascade)
     - [2.3 4_genre_parents](#23-4_genre_parents)
       - [2.3.1 `manual_canonical_parents.csv` backstop](#231-manual_canonical_parentscsv-backstop)
@@ -205,7 +205,7 @@ violates these constraints, on blank `item_id`/`item_label`, or on duplicate `it
 Reclassifying an item this way excludes it from `5_hierarchy` as a canonical genre — it becomes a
 scaffolding node in `5_regional_hierarchy` only, the same as any other `regional_overview` item.
 It's also included in `3_regional_classification`'s seed set (see
-[2.2.2](#222-rule-three-seed-sources)), so regional status still cascades correctly to its
+[2.2.2](#222-rule-four-seed-sources)), so regional status still cascades correctly to its
 children.
 
 #### 2.1.6 Scope of this first pass
@@ -232,7 +232,7 @@ Bronze `wikidata_genre_country_of_origin.parquet` (`P495`, "country of origin") 
 canonical umbrella genres too, e.g. jazz, heavy metal music, which would wrongly cascade regional
 status onto their real subgenres).
 
-#### 2.2.2 Rule: three seed sources
+#### 2.2.2 Rule: four seed sources
 
 Four kinds of items seed the regional graph and are themselves flagged `is_regional = True`, not
 merely a launching point for other items:
