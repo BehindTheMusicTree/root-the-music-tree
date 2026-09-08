@@ -211,10 +211,8 @@ children.
 #### 2.1.6 Scope of this first pass
 
 This is a first classification pass covering the single highest-confidence, most mechanical rule
-found during analysis. Other non-genre categories are known to exist in the Bronze data (musical
-forms/techniques like "fugue" or "polyphony", ensemble/format labels like "big band music") but
-aren't covered here yet — they don't reduce to one clean, false-positive-free rule the way
-`regional_overview` does, and are left for a later Silver step.
+found during analysis. Other non-genre categories are pruned separately, later, via manual CSV
+backstops (see [2.4.1](#241-manual-csv-backstops)) rather than an automated rule here.
 
 ### 2.2 3_regional_classification
 
