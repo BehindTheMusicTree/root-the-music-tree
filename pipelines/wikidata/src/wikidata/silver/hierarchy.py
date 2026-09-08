@@ -7,56 +7,13 @@ logger = logging.getLogger(__name__)
 
 OUTPUT_COLUMNS = ["item_id", "item_label", "item_url", "parent_id", "parent_label", "parent_url", "relation_type"]
 
-# Committed alongside the code (not a gitignored bronze/silver output) because it's hand-curated,
-# not fetched from Wikidata: genre items organized around a subject/theme/subculture (e.g. "LGBT
-# music", "steampunk music", "bronycore") rather than a geography, ethnicity, or musical style
-# don't belong in either the canonical or regional genre tree. A data expert reviewing the root
-# lists adds them here with a `reason`; they're dropped entirely from both 5_hierarchy.parquet and
-# 5_regional_hierarchy.parquet, and any child edge pointing at one is severed the same way an edge
-# to a non-genre/non-regional parent already is (see _prune_canonical/_prune_regional).
-MANUAL_THEME_GENRES_PATH = Path(__file__).parent / "manual_theme_genres.csv"
-
-# Same mechanism as MANUAL_THEME_GENRES_PATH, but for items that are a compositional/performance
-# technique (e.g. "crab canon", "fauxbourdon", "call and response") rather than a genre at all — no
-# automated signal distinguishes a technique from a genre either, so a data expert reviewing the
-# root lists adds them here by hand. Dropped entirely from both outputs the same way theme items are.
-MANUAL_TECHNIQUE_GENRES_PATH = Path(__file__).parent / "manual_technique_genres.csv"
-
-# Same mechanism as MANUAL_THEME_GENRES_PATH, but for items that are simply not a music genre at
-# all — Wikidata's P31 "music genre" classification was wrong (e.g. a near-empty stub with no real
-# description, a record label, an event, a person) rather than the item being a real genre that's
-# off-topic (that's MANUAL_THEME_GENRES_PATH) or a technique (MANUAL_TECHNIQUE_GENRES_PATH). No
-# automated signal distinguishes this either, so it's curated by hand the same way, and dropped
-# identically — from both outputs, before either stage below runs.
-MANUAL_OUT_OF_SCOPE_GENRES_PATH = Path(__file__).parent / "manual_out_of_scope_genres.csv"
-
-
-def _load_dropped_ids(df: pl.DataFrame, manual_csv: pl.DataFrame, csv_name: str) -> set[str]:
-    if "item_id" not in manual_csv.columns:
-        raise ValueError(f"{csv_name} is missing the required 'item_id' column")
-    manual_csv = manual_csv.with_columns(pl.col("item_id").cast(pl.Utf8).str.strip_chars())
-    blank = manual_csv.filter(pl.col("item_id").is_null() | (pl.col("item_id") == ""))
-    if not blank.is_empty():
-        raise ValueError(f"{csv_name} has row(s) with a null/blank 'item_id'")
-
-    dropped_item_ids = manual_csv.select("item_id").to_series().to_list()
-    if len(dropped_item_ids) != len(set(dropped_item_ids)):
-        raise ValueError(f"{csv_name} contains duplicate item_id rows")
-
-    known_item_ids = set(df.select("item_id").unique().to_series())
-    dropped_ids = set(manual_csv.select("item_id").unique().to_series())
-    unknown_item_ids = sorted(item_id for item_id in dropped_ids if item_id not in known_item_ids)
-    if unknown_item_ids:
-        raise ValueError(f"{csv_name} rows reference item_id(s) not found in the genre tree: {unknown_item_ids}")
-    return dropped_ids
-
 
 def _collapse_to_lowest_qid(edges: pl.DataFrame) -> pl.DataFrame:
     # Wikidata's P279/P361 graph isn't a strict tree: ~43% of genre items have more than one
     # surviving genre parent, and only 1 item in the whole extension has a "preferred rank" P279
     # statement to disambiguate with (checked live). No reliable signal exists, so — provisionally,
     # pending a real product/curation decision — keep only the lowest-QID parent per item. This is
-    # a tâtonnement placeholder, not a considered rule; see DESIGN.md#24-5_hierarchy.
+    # a tâtonnement placeholder, not a considered rule; see DESIGN.md#24-5_canonical_hierarchy.
     return (
         edges.with_columns(parent_numeric_id=pl.col("parent_id").str.slice(1).cast(pl.Int64, strict=False))
         .sort(["item_id", "parent_numeric_id"])
@@ -69,7 +26,7 @@ def _prune_canonical(items: pl.DataFrame) -> pl.DataFrame:
     # Mirrors _prune_regional below: an item whose parent edges all lead to a non-genre item (e.g.
     # "electronic music" -> "music") would otherwise vanish entirely instead of surfacing as a root,
     # unlike an item with no parent edge at all.
-    is_genre_edge = pl.col("parent_id").is_null() | pl.col("parent_is_genre")
+    is_genre_edge = pl.col("parent_id").is_null() | pl.col("parent_is_canonical")
     collapsed = _collapse_to_lowest_qid(items.filter(is_genre_edge))
 
     orphans = (
@@ -112,28 +69,9 @@ def _prune_regional(items: pl.DataFrame) -> pl.DataFrame:
     return pl.concat([collapsed, orphans])
 
 
-def prune_genre_hierarchy(
-    genre_parents_path: Path,
-    manual_theme_genres_path: Path,
-    manual_technique_genres_path: Path,
-    manual_out_of_scope_genres_path: Path,
-    output_dir: Path,
-) -> tuple[Path, Path]:
-    logger.info("pruning genre hierarchy from %s", genre_parents_path)
-    df = pl.read_parquet(genre_parents_path)
-    manual_theme_genres = pl.read_csv(manual_theme_genres_path)
-    manual_technique_genres = pl.read_csv(manual_technique_genres_path)
-    manual_out_of_scope_genres = pl.read_csv(manual_out_of_scope_genres_path)
-    theme_ids = _load_dropped_ids(df, manual_theme_genres, "manual_theme_genres.csv")
-    technique_ids = _load_dropped_ids(df, manual_technique_genres, "manual_technique_genres.csv")
-    out_of_scope_ids = _load_dropped_ids(df, manual_out_of_scope_genres, "manual_out_of_scope_genres.csv")
-    dropped_ids = theme_ids | technique_ids | out_of_scope_ids
-
-    df = df.filter(~pl.col("item_id").is_in(list(dropped_ids))).with_columns(
-        parent_is_genre=pl.when(pl.col("parent_id").is_in(list(dropped_ids)))
-        .then(pl.lit(False))
-        .otherwise(pl.col("parent_is_genre"))
-    )
+def prune_genre_hierarchy(canonical_parents_path: Path, output_dir: Path) -> tuple[Path, Path]:
+    logger.info("pruning genre hierarchy from %s", canonical_parents_path)
+    df = pl.read_parquet(canonical_parents_path)
 
     parent_is_regional = df.select(
         pl.col("item_id").alias("parent_id"), pl.col("is_regional").alias("parent_is_regional")
@@ -151,7 +89,7 @@ def prune_genre_hierarchy(
     regional = _prune_regional(regional_items)
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    canonical_path = output_dir / "5_hierarchy.parquet"
+    canonical_path = output_dir / "5_canonical_hierarchy.parquet"
     regional_path = output_dir / "5_regional_hierarchy.parquet"
     canonical.write_parquet(canonical_path)
     regional.write_parquet(regional_path)

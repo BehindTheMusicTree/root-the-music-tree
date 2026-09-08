@@ -15,7 +15,7 @@ WIKIDATA_ITEM_URL_PREFIX = "https://www.wikidata.org/wiki/"
 # this does not affect is_regional/regional_reason — it only supplies a missing canonical parent
 # edge. `parent_item_id` must reference another genre item already in the tree (not a
 # `is_regional_overview` item — that's what manual_regional_overrides.csv is for).
-# See DESIGN.md#23-4_genre_parents.
+# See DESIGN.md#23-4_canonical_parents.
 MANUAL_CANONICAL_PARENTS_PATH = Path(__file__).parent / "manual_canonical_parents.csv"
 
 
@@ -136,29 +136,29 @@ def _apply_canonical_parent_overrides(df: pl.DataFrame, manual_parents: pl.DataF
     return pl.concat([df, synthetic_edges])
 
 
-def flag_genre_parents(
+def flag_canonical_parents(
     regional_classification_path: Path, manual_canonical_parents_path: Path, output_dir: Path
 ) -> Path:
-    logger.info("flagging genre-only parents in %s", regional_classification_path)
+    logger.info("flagging canonical-only parents in %s", regional_classification_path)
     df = pl.read_parquet(regional_classification_path)
     manual_canonical_parents = pl.read_csv(manual_canonical_parents_path)
     df = _apply_canonical_parent_overrides(df, manual_canonical_parents)
 
     genre_ids = df.filter(~pl.col("is_regional_overview")).select("item_id").unique().to_series().to_list()
     df = df.with_columns(
-        parent_is_genre=pl.when(pl.col("parent_id").is_null())
+        parent_is_canonical=pl.when(pl.col("parent_id").is_null())
         .then(None)
         .otherwise(pl.col("parent_id").is_in(genre_ids))
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / "4_genre_parents.parquet"
+    output_path = output_dir / "4_canonical_parents.parquet"
     df.write_parquet(output_path)
     logger.info(
-        "wrote %d rows to %s (%d non-genre parent edges flagged)",
+        "wrote %d rows to %s (%d non-canonical parent edges flagged)",
         df.height,
         output_path,
-        df.filter(~pl.col("parent_is_genre")).height,
+        df.filter(~pl.col("parent_is_canonical")).height,
     )
 
     return output_path

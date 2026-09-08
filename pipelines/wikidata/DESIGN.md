@@ -26,13 +26,13 @@ pipeline. See [SCHEMA.md](SCHEMA.md) for column definitions and data profiles.
       - [2.2.1 Inputs](#221-inputs)
       - [2.2.2 Rule: four seed sources](#222-rule-four-seed-sources)
       - [2.2.3 Cascade](#223-cascade)
-    - [2.3 4_genre_parents](#23-4_genre_parents)
+      - [2.2.4 Manual CSV backstops for non-genre pruning](#224-manual-csv-backstops-for-non-genre-pruning)
+    - [2.3 4_canonical_parents](#23-4_canonical_parents)
       - [2.3.1 `manual_canonical_parents.csv` backstop](#231-manual_canonical_parentscsv-backstop)
-      - [2.3.2 Rule: what counts as a genre parent](#232-rule-what-counts-as-a-genre-parent)
-    - [2.4 5_hierarchy](#24-5_hierarchy)
-      - [2.4.1 Manual CSV backstops](#241-manual-csv-backstops)
-      - [2.4.2 Rule: two-stage pruning](#242-rule-two-stage-pruning)
-      - [2.4.3 Known consequence — the two outputs diverge here](#243-known-consequence--the-two-outputs-diverge-here)
+      - [2.3.2 Rule: what counts as a canonical parent](#232-rule-what-counts-as-a-canonical-parent)
+    - [2.4 5_canonical_hierarchy](#24-5_canonical_hierarchy)
+      - [2.4.1 Rule: two-stage pruning](#241-rule-two-stage-pruning)
+      - [2.4.2 Known consequence — the two outputs diverge here](#242-known-consequence--the-two-outputs-diverge-here)
 
 ## 1. Bronze
 
@@ -78,7 +78,7 @@ genre).
 Bronze ingests this raw and unfiltered, consistent with the "as-is" bronze principle used for
 MusicBrainz's tables (see [`../musicbrainz/SCHEMA.md`](../musicbrainz/SCHEMA.md)). Flagging
 genre-only parents and pruning to a single parent per item is Silver-layer work — see
-[`2.3 4_genre_parents`](#23-4_genre_parents) (flagging) and [`2.4 5_hierarchy`](#24-5_hierarchy)
+[`2.3 4_canonical_parents`](#23-4_canonical_parents) (flagging) and [`2.4 5_canonical_hierarchy`](#24-5_canonical_hierarchy)
 (pruning) below.
 
 #### 1.1.3 Bare QIDs, not full entity URIs
@@ -129,7 +129,7 @@ This tags, it does not exclude: `regional_overview` items stay in every downstre
 and are the seed set [`2.2 3_regional_classification`](#22-3_regional_classification) propagates
 `is_regional` down from — any genre item with a parent edge into one of these becomes a regional
 genre, and the seeds themselves become regional genre nodes in their own right (see
-[`2.4 5_hierarchy`](#24-5_hierarchy)).
+[`2.4 5_canonical_hierarchy`](#24-5_canonical_hierarchy)).
 
 #### 2.1.3 Auto-promotion of orphan `"music of "` parents
 
@@ -202,7 +202,7 @@ tree with a matching `item_label`, and must not already be flagged `is_regional_
 prefix rule (nothing to reclassify in that case). As usual, the pipeline fails fast on any row that
 violates these constraints, on blank `item_id`/`item_label`, or on duplicate `item_id` rows.
 
-Reclassifying an item this way excludes it from `5_hierarchy` as a canonical genre — it becomes a
+Reclassifying an item this way excludes it from `5_canonical_hierarchy` as a canonical genre — it becomes a
 scaffolding node in `5_regional_hierarchy` only, the same as any other `regional_overview` item.
 It's also included in `3_regional_classification`'s seed set (see
 [2.2.2](#222-rule-four-seed-sources)), so regional status still cascades correctly to its
@@ -211,8 +211,9 @@ children.
 #### 2.1.6 Scope of this first pass
 
 This is a first classification pass covering the single highest-confidence, most mechanical rule
-found during analysis. Other non-genre categories are pruned separately, later, via manual CSV
-backstops (see [2.4.1](#241-manual-csv-backstops)) rather than an automated rule here.
+found during analysis. Other non-genre categories are pruned separately, in
+`3_regional_classification`, via manual CSV backstops (see
+[2.2.4](#224-manual-csv-backstops-for-non-genre-pruning)) rather than an automated rule here.
 
 ### 2.2 3_regional_classification
 
@@ -232,7 +233,7 @@ status onto their real subgenres).
 
 #### 2.2.2 Rule: four seed sources
 
-Four kinds of items seed the regional graph and are themselves flagged `is_regional = True`, not
+Three kinds of items seed the regional graph and are themselves flagged `is_regional = True`, not
 merely a launching point for other items:
 
 - `regional_overview` items (from `2_regional_overview_classification`, e.g. "music of Kenya",
@@ -305,11 +306,35 @@ reaches regional status via an already-flagged parent that isn't itself a seed.
 > investigation into why Wikidata's own query misses it (wrong assumed label, different
 > instance-of class, etc.) rather than being treated as a non-issue.
 
-### 2.3 4_genre_parents
+#### 2.2.4 Manual CSV backstops for non-genre pruning
+
+Three git-tracked, hand-curated CSVs (same columns: `item_id`, `item_label`, `reason`) each list
+items that no automated signal distinguishes from a real genre, so a data expert reviewing the
+root lists adds them by hand. Every `item_id` across all three is dropped from the genre tree
+**before** the seed/cascade logic above runs (unknown `item_id`s raise), so a dropped item can
+never sit on a cascade path and hand its `is_regional` status down to a real genre beneath it —
+any child edge that pointed at one is treated exactly like an edge into a non-genre/non-regional
+parent (severed in [5_canonical_hierarchy](#24-5_canonical_hierarchy)'s pruning stage) rather than
+left dangling:
+
+- `manual_theme_genres.csv` — genre items organized around a subject/theme/subculture (e.g. "LGBT
+  music", "steampunk music", "bronycore") rather than a geography, ethnicity, or musical style.
+- `manual_technique_genres.csv` — compositional or performance techniques (e.g. "crab canon",
+  "fauxbourdon", "call and response") rather than a genre at all.
+- `manual_out_of_scope_genres.csv` — items that aren't a music genre at all, i.e. Wikidata's `P31`
+  "music genre" classification was simply wrong (e.g. a near-empty stub with no real description,
+  a record label, an event, a person) — as opposed to a real but off-topic genre
+  (`manual_theme_genres.csv`) or a technique (`manual_technique_genres.csv`).
+
+> This drop happens here rather than at `5_canonical_hierarchy` purely as a hardening measure: on
+> current data no dropped item sits upstream of a real genre in the cascade, so the reorder is a
+> no-op today. It guards against future Wikidata drift where that stops being true.
+
+### 2.3 4_canonical_parents
 
 #### 2.3.1 `manual_canonical_parents.csv` backstop
 
-Before the `parent_is_genre` flag is computed, this step also reads a git-tracked, hand-curated
+Before the `parent_is_canonical` flag is computed, this step also reads a git-tracked, hand-curated
 `manual_canonical_parents.csv` (columns: `item_id`, `item_label`, `reason`, `parent_item_id`) and
 applies each row as a synthetic parent edge, replacing the item's null-parent root row.
 
@@ -322,55 +347,50 @@ only supplies a missing canonical parent edge, tagged `relation_type =
 "manual_canonical_parent"`.
 
 The pipeline fails fast if `parent_item_id` is missing/blank, if `item_id` or `parent_item_id`
-isn't a known item in the tree, or if `parent_item_id` points at an item flagged
-`is_regional_overview` (that's what `manual_regional_overrides.csv` is for).
+isn't a known item in the tree, if `parent_item_id` points at an item flagged
+`is_regional_overview` (that's what `manual_regional_overrides.csv` is for), or if `item_id`
+already has a non-null `parent_id` in the genre tree.
 
-#### 2.3.2 Rule: what counts as a genre parent
+> ⚠️ **Provisional / trial-and-error:** the root-only restriction is a temporary scope limit, not a
+> permanent rule — this backstop is currently for items with no `P279`/`P361` parent at all. In
+> principle a data expert could just as well want to override a non-root item's existing parent
+> edge (e.g. a mis-collapsed multi-parent case from the [2.4.1](#241-rule-two-stage-pruning)
+> lowest-QID heuristic). That's deliberately out of scope here until there's a considered rule for choosing
+> among multiple candidate parents — allowing overrides on non-root items today would let this CSV
+> silently mask that unsolved problem instead of surfacing it.
+
+#### 2.3.2 Rule: what counts as a canonical parent
 
 A parent counts as an actual musical style only if it is flagged `is_regional_overview = False` by
 `2_regional_overview_classification` — not merely present in Bronze's raw `P31` "music genre"
 extension. This keeps the Silver steps agreeing with each other: an edge into a `regional_overview`
-item like "music of Kenya" is `parent_is_genre = False`, the same as an edge into a concept that
+item like "music of Kenya" is `parent_is_canonical = False`, the same as an edge into a concept that
 was never `P31` "music genre" at all (e.g. "opera" → "composed musical work").
 
 Non-genre parents span both a genre item tagged non-genre in step 1 (e.g. an edge into "music of
 Tanzania") and a parent that was never in Bronze's `P31` "music genre" extension at all (e.g.
 "national song" → "national anthem", "Renaissance music" → "Renaissance art") — both count as
-`parent_is_genre = false` under the rule above.
+`parent_is_canonical = false` under the rule above.
 
-### 2.4 5_hierarchy
+### 2.4 5_canonical_hierarchy
 
-`5_hierarchy.parquet` (canonical) and `5_regional_hierarchy.parquet` (regional) are the first
-Silver step that actually prunes rather than flags: it reduces `4_genre_parents.parquet` to one
+`5_canonical_hierarchy.parquet` (canonical) and `5_regional_hierarchy.parquet` (regional) are the first
+Silver step that actually prunes rather than flags: it reduces `4_canonical_parents.parquet` to one
 row per genre item, split into two clean, directly-consumable genre hierarchy edge lists — a
 canonical one, excluding every `is_regional = true` item, and a regional one, containing only
 `is_regional = true` items (which now includes the `regional_overview` seed items themselves).
 
-#### 2.4.1 Manual CSV backstops
+#### 2.4.1 Rule: two-stage pruning
 
-Three git-tracked, hand-curated CSVs (same columns: `item_id`, `item_label`, `reason`) each list
-items that no automated signal distinguishes from a real genre, so a data expert reviewing the
-root lists adds them by hand. Every `item_id` across all three is dropped entirely from **both**
-outputs before either pruning stage below runs (unknown `item_id`s raise), and any child edge that
-pointed at one is treated exactly like an edge into a non-genre/non-regional parent (severed, per
-stage 1) rather than left dangling:
-
-- `manual_theme_genres.csv` — genre items organized around a subject/theme/subculture (e.g. "LGBT
-  music", "steampunk music", "bronycore") rather than a geography, ethnicity, or musical style.
-- `manual_technique_genres.csv` — compositional or performance techniques (e.g. "crab canon",
-  "fauxbourdon", "call and response") rather than a genre at all.
-- `manual_out_of_scope_genres.csv` — items that aren't a music genre at all, i.e. Wikidata's `P31`
-  "music genre" classification was simply wrong (e.g. a near-empty stub with no real description,
-  a record label, an event, a person) — as opposed to a real but off-topic genre
-  (`manual_theme_genres.csv`) or a technique (`manual_technique_genres.csv`).
-
-#### 2.4.2 Rule: two-stage pruning
+The three manual CSV backstops that drop non-genre items entirely are applied earlier, in
+[3_regional_classification](#224-manual-csv-backstops-for-non-genre-pruning) — by the time this
+step runs, those items are already gone from the tree.
 
 Applied in two stages, run separately for the two outputs:
 
-1. **Prune to same-graph edges.** For `5_hierarchy`, keep a row only if
+1. **Prune to same-graph edges.** For `5_canonical_hierarchy`, keep a row only if
    `is_regional_overview = False` for the item itself and it is _not_ `is_regional`, and either
-   `parent_id` is null (a root) or `parent_is_genre = True` and the parent is not itself regional.
+   `parent_id` is null (a root) or `parent_is_canonical = True` and the parent is not itself regional.
    For `5_regional_hierarchy`, keep a row only if the item _is_ `is_regional` (seed items
    included), and either `parent_id` is null or the parent is itself `is_regional = True`. Either
    way, an edge into a non-regional, non-genre parent, or across the canonical/regional boundary,
@@ -378,7 +398,7 @@ Applied in two stages, run separately for the two outputs:
 2. **Collapse multi-parent items to one row.** If an item still has more than one surviving parent
    within its own output, keep only the edge to the parent with the lowest numeric QID.
 
-> ⚠️ **Provisional / tâtonnement:** the lowest-QID rule in stage 2 is an arbitrary placeholder, not
+> ⚠️ **Provisional / trial-and-error:** the lowest-QID rule in stage 2 is an arbitrary placeholder, not
 > a considered design decision. QIDs are assigned by Wikidata in creation order and carry no
 > taxonomic meaning. It exists only because no better signal is currently available: live SPARQL
 > queries against the real genre extension found that **2,727 of ~6,337 genre items (~43%)** have
@@ -391,9 +411,9 @@ Applied in two stages, run separately for the two outputs:
 > decision exists, and should be expected to change, likely once real curation input (e.g. via
 > GrowTheMusicTree) is available.
 
-#### 2.4.3 Known consequence — the two outputs diverge here
+#### 2.4.2 Known consequence — the two outputs diverge here
 
-In `5_hierarchy` (canonical), an item whose every parent edge points to a non-genre or regional
+In `5_canonical_hierarchy` (canonical), an item whose every parent edge points to a non-genre or regional
 parent (and which isn't itself a root) has all its rows dropped in stage 1 — it disappears
 entirely, not even as an implicit root (e.g. "opera" → "composed musical work").
 
@@ -403,10 +423,10 @@ than being dropped — so an item like "morna," whose only parent is that seed, 
 edge instead of being promoted to a synthetic root itself.
 
 Check `profile_hierarchy`'s "zero surviving rows in either output" count (see
-[SCHEMA.md#36-5_hierarchy](SCHEMA.md#36-5_hierarchy)) for how often the canonical vanishing still
+[SCHEMA.md#36-5_canonical_hierarchy](SCHEMA.md#36-5_canonical_hierarchy)) for how often the canonical vanishing still
 happens.
 
-> ⚠️ **Under exploration:** `5_hierarchy` (canonical) surfaces a high number of root items
+> ⚠️ **Under exploration:** `5_canonical_hierarchy` (canonical) surfaces a high number of root items
 > (`parent_id = null`) — **297 of 805 rows as of this writing** — not the small handful a genre
 > tree with one or two top-level categories (e.g. "music") would suggest. Whether that many roots
 > is a real property of the source data (genuinely disconnected genre subtrees) or an artifact of

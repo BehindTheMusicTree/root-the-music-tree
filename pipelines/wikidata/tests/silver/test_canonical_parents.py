@@ -3,7 +3,7 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from wikidata.silver import genre_parents as sg
+from wikidata.silver import canonical_parents as sg
 
 REGIONAL_CLASSIFICATION_ROWS = [
     # rock music -> popular music: popular music is a real genre (is_regional_overview=False)
@@ -92,16 +92,18 @@ def _write_manual_canonical_parents(tmp_path: Path) -> Path:
     return manual_canonical_parents_path
 
 
-def test_flag_genre_parents_marks_parent_status(tmp_path: Path) -> None:
+def test_flag_canonical_parents_marks_parent_status(tmp_path: Path) -> None:
     regional_classification_path = _write_regional_classification(tmp_path)
     manual_canonical_parents_path = _write_manual_canonical_parents(tmp_path)
     output_dir = tmp_path / "silver"
 
-    result = sg.flag_genre_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
+    result = sg.flag_canonical_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
 
-    assert result == output_dir / "4_genre_parents.parquet"
-    parent_is_genre_by_item = {row["item_id"]: row["parent_is_genre"] for row in pl.read_parquet(result).to_dicts()}
-    assert parent_is_genre_by_item == {
+    assert result == output_dir / "4_canonical_parents.parquet"
+    parent_is_canonical_by_item = {
+        row["item_id"]: row["parent_is_canonical"] for row in pl.read_parquet(result).to_dicts()
+    }
+    assert parent_is_canonical_by_item == {
         "Q11399": True,  # parent (popular music) is_regional_overview=False
         "Q9778": None,  # root item, no parent
         "Q1344": False,  # parent not in the genre extension at all
@@ -110,7 +112,7 @@ def test_flag_genre_parents_marks_parent_status(tmp_path: Path) -> None:
     }
 
 
-def test_flag_genre_parents_applies_manual_canonical_parent_override(tmp_path: Path) -> None:
+def test_flag_canonical_parents_applies_manual_canonical_parent_override(tmp_path: Path) -> None:
     regional_classification_path = _write_regional_classification(tmp_path)
     manual_canonical_parents_path = tmp_path / "manual_canonical_parents.csv"
     pl.DataFrame(
@@ -123,17 +125,17 @@ def test_flag_genre_parents_applies_manual_canonical_parent_override(tmp_path: P
     ).write_csv(manual_canonical_parents_path)
     output_dir = tmp_path / "silver"
 
-    result = sg.flag_genre_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
+    result = sg.flag_canonical_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
 
     rows_by_item = {row["item_id"]: row for row in pl.read_parquet(result).to_dicts()}
     overridden = rows_by_item["Q9778"]
     assert overridden["parent_id"] == "Q1344"
     assert overridden["parent_label"] == "opera"
     assert overridden["relation_type"] == "manual_canonical_parent"
-    assert overridden["parent_is_genre"] is True
+    assert overridden["parent_is_canonical"] is True
 
 
-def test_flag_genre_parents_raises_on_missing_parent_item_id_column(tmp_path: Path) -> None:
+def test_flag_canonical_parents_raises_on_missing_parent_item_id_column(tmp_path: Path) -> None:
     regional_classification_path = _write_regional_classification(tmp_path)
     manual_canonical_parents_path = tmp_path / "manual_canonical_parents.csv"
     pl.DataFrame({"item_id": ["Q9778"], "item_label": ["popular music"], "reason": ["test"]}).write_csv(
@@ -142,10 +144,10 @@ def test_flag_genre_parents_raises_on_missing_parent_item_id_column(tmp_path: Pa
     output_dir = tmp_path / "silver"
 
     with pytest.raises(ValueError, match="parent_item_id"):
-        sg.flag_genre_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
+        sg.flag_canonical_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
 
 
-def test_flag_genre_parents_raises_on_missing_item_id_column(tmp_path: Path) -> None:
+def test_flag_canonical_parents_raises_on_missing_item_id_column(tmp_path: Path) -> None:
     regional_classification_path = _write_regional_classification(tmp_path)
     manual_canonical_parents_path = tmp_path / "manual_canonical_parents.csv"
     pl.DataFrame({"item_label": ["popular music"], "reason": ["test"], "parent_item_id": ["Q1344"]}).write_csv(
@@ -154,10 +156,10 @@ def test_flag_genre_parents_raises_on_missing_item_id_column(tmp_path: Path) -> 
     output_dir = tmp_path / "silver"
 
     with pytest.raises(ValueError, match="item_id"):
-        sg.flag_genre_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
+        sg.flag_canonical_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
 
 
-def test_flag_genre_parents_raises_on_unknown_item_id(tmp_path: Path) -> None:
+def test_flag_canonical_parents_raises_on_unknown_item_id(tmp_path: Path) -> None:
     regional_classification_path = _write_regional_classification(tmp_path)
     manual_canonical_parents_path = tmp_path / "manual_canonical_parents.csv"
     pl.DataFrame(
@@ -171,10 +173,10 @@ def test_flag_genre_parents_raises_on_unknown_item_id(tmp_path: Path) -> None:
     output_dir = tmp_path / "silver"
 
     with pytest.raises(ValueError, match="Q0000000"):
-        sg.flag_genre_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
+        sg.flag_canonical_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
 
 
-def test_flag_genre_parents_raises_on_unknown_parent_item_id(tmp_path: Path) -> None:
+def test_flag_canonical_parents_raises_on_unknown_parent_item_id(tmp_path: Path) -> None:
     regional_classification_path = _write_regional_classification(tmp_path)
     manual_canonical_parents_path = tmp_path / "manual_canonical_parents.csv"
     pl.DataFrame(
@@ -188,10 +190,10 @@ def test_flag_genre_parents_raises_on_unknown_parent_item_id(tmp_path: Path) -> 
     output_dir = tmp_path / "silver"
 
     with pytest.raises(ValueError, match="Q0000000"):
-        sg.flag_genre_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
+        sg.flag_canonical_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
 
 
-def test_flag_genre_parents_raises_on_parent_item_id_is_regional_overview(tmp_path: Path) -> None:
+def test_flag_canonical_parents_raises_on_parent_item_id_is_regional_overview(tmp_path: Path) -> None:
     regional_classification_path = _write_regional_classification(tmp_path)
     manual_canonical_parents_path = tmp_path / "manual_canonical_parents.csv"
     pl.DataFrame(
@@ -205,10 +207,10 @@ def test_flag_genre_parents_raises_on_parent_item_id_is_regional_overview(tmp_pa
     output_dir = tmp_path / "silver"
 
     with pytest.raises(ValueError, match="Q3868594"):
-        sg.flag_genre_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
+        sg.flag_canonical_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
 
 
-def test_flag_genre_parents_raises_on_blank_item_id(tmp_path: Path) -> None:
+def test_flag_canonical_parents_raises_on_blank_item_id(tmp_path: Path) -> None:
     regional_classification_path = _write_regional_classification(tmp_path)
     manual_canonical_parents_path = tmp_path / "manual_canonical_parents.csv"
     pl.DataFrame(
@@ -217,10 +219,10 @@ def test_flag_genre_parents_raises_on_blank_item_id(tmp_path: Path) -> None:
     output_dir = tmp_path / "silver"
 
     with pytest.raises(ValueError, match="null/blank"):
-        sg.flag_genre_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
+        sg.flag_canonical_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
 
 
-def test_flag_genre_parents_raises_on_override_for_regional_item(tmp_path: Path) -> None:
+def test_flag_canonical_parents_raises_on_override_for_regional_item(tmp_path: Path) -> None:
     regional_classification_path = _write_regional_classification(tmp_path)
     manual_canonical_parents_path = tmp_path / "manual_canonical_parents.csv"
     pl.DataFrame(
@@ -234,10 +236,10 @@ def test_flag_genre_parents_raises_on_override_for_regional_item(tmp_path: Path)
     output_dir = tmp_path / "silver"
 
     with pytest.raises(ValueError, match="Q3868594"):
-        sg.flag_genre_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
+        sg.flag_canonical_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
 
 
-def test_flag_genre_parents_raises_on_parent_item_id_is_regional(tmp_path: Path) -> None:
+def test_flag_canonical_parents_raises_on_parent_item_id_is_regional(tmp_path: Path) -> None:
     regional_classification_path = _write_regional_classification(tmp_path)
     manual_canonical_parents_path = tmp_path / "manual_canonical_parents.csv"
     pl.DataFrame(
@@ -251,10 +253,10 @@ def test_flag_genre_parents_raises_on_parent_item_id_is_regional(tmp_path: Path)
     output_dir = tmp_path / "silver"
 
     with pytest.raises(ValueError, match="Q999999"):
-        sg.flag_genre_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
+        sg.flag_canonical_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
 
 
-def test_flag_genre_parents_raises_on_duplicate_item_id(tmp_path: Path) -> None:
+def test_flag_canonical_parents_raises_on_duplicate_item_id(tmp_path: Path) -> None:
     regional_classification_path = _write_regional_classification(tmp_path)
     manual_canonical_parents_path = tmp_path / "manual_canonical_parents.csv"
     pl.DataFrame(
@@ -268,10 +270,10 @@ def test_flag_genre_parents_raises_on_duplicate_item_id(tmp_path: Path) -> None:
     output_dir = tmp_path / "silver"
 
     with pytest.raises(ValueError, match="duplicate"):
-        sg.flag_genre_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
+        sg.flag_canonical_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
 
 
-def test_flag_genre_parents_raises_on_override_for_non_root_item(tmp_path: Path) -> None:
+def test_flag_canonical_parents_raises_on_override_for_non_root_item(tmp_path: Path) -> None:
     regional_classification_path = _write_regional_classification(tmp_path)
     manual_canonical_parents_path = tmp_path / "manual_canonical_parents.csv"
     pl.DataFrame(
@@ -285,14 +287,14 @@ def test_flag_genre_parents_raises_on_override_for_non_root_item(tmp_path: Path)
     output_dir = tmp_path / "silver"
 
     with pytest.raises(ValueError, match="Q11399"):
-        sg.flag_genre_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
+        sg.flag_canonical_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
 
 
-def test_flag_genre_parents_creates_output_dir(tmp_path: Path) -> None:
+def test_flag_canonical_parents_creates_output_dir(tmp_path: Path) -> None:
     regional_classification_path = _write_regional_classification(tmp_path)
     manual_canonical_parents_path = _write_manual_canonical_parents(tmp_path)
     output_dir = tmp_path / "does" / "not" / "exist"
 
-    sg.flag_genre_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
+    sg.flag_canonical_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
 
     assert output_dir.is_dir()
