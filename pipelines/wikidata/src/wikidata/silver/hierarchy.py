@@ -56,7 +56,7 @@ def _collapse_to_lowest_qid(edges: pl.DataFrame) -> pl.DataFrame:
     # surviving genre parent, and only 1 item in the whole extension has a "preferred rank" P279
     # statement to disambiguate with (checked live). No reliable signal exists, so — provisionally,
     # pending a real product/curation decision — keep only the lowest-QID parent per item. This is
-    # a tâtonnement placeholder, not a considered rule; see SCHEMA.md.
+    # a tâtonnement placeholder, not a considered rule; see DESIGN.md#24-5_hierarchy.
     return (
         edges.with_columns(parent_numeric_id=pl.col("parent_id").str.slice(1).cast(pl.Int64, strict=False))
         .sort(["item_id", "parent_numeric_id"])

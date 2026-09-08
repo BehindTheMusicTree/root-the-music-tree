@@ -39,7 +39,7 @@ COUNTRY_OF_ORIGIN_QUERY_VARIABLES = ("item", "countryOfOrigin", "countryOfOrigin
 # P279/P361 edges to find its parent(s) — never P31 for the parent edges, and never
 # a P279 walk to find the genre set (a direct P279 query against "music genre"
 # itself finds only 12 items, mostly meta-categories like "rock genre" rather
-# than real genres — see SCHEMA.md).
+# than real genres — see DESIGN.md#1-bronze).
 #
 # For each genre, we ingest its direct P279 ("subclass of") and P361 ("part of")
 # parent(s), tagging each edge with ?relation so the two relationship types

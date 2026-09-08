@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 RECORDINGS_PER_GENRE = 5
 
 # `link_type.name` (e.g. "free streaming", "streaming") doesn't distinguish platform — the same
-# name is used for YouTube, Bandcamp, etc. (see SCHEMA.md#bronze) — so a YouTube video still has
+# name is used for YouTube, Bandcamp, etc. (see SCHEMA.md#1-bronze) — so a YouTube video still has
 # to be identified by matching `url.url` itself, same as the retired `1_recording_youtube_url` step.
 _YOUTUBE_URL_PATTERN = r"(?:youtube(?:-nocookie)?\.com|youtu\.be)"
 
