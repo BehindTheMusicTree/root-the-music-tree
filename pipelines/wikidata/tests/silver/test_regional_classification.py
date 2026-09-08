@@ -206,6 +206,57 @@ def test_classify_regional_genres_cascades_from_seeds(tmp_path: Path) -> None:
     }
 
 
+def test_classify_regional_genres_treats_manual_overview_reclassification_as_seed(tmp_path: Path) -> None:
+    genre_classification_path = tmp_path / "2_regional_overview_classification.parquet"
+    pl.DataFrame(
+        [
+            # European folk music: reclassified as a regional overview (not via the "music of "
+            # prefix rule), so it must seed the cascade the same as a regular regional_overview item.
+            {
+                "item_id": "Q98528192",
+                "item_label": "European folk music",
+                "parent_id": None,
+                "parent_label": None,
+                "relation_type": None,
+                "item_url": "https://www.wikidata.org/wiki/Q98528192",
+                "parent_url": None,
+                "is_regional_overview": True,
+                "classification_reason": "manual_overview_reclassification",
+            },
+            # Hungarian folk music: direct child of the reclassified seed
+            {
+                "item_id": "Q1361992",
+                "item_label": "Hungarian folk music",
+                "parent_id": "Q98528192",
+                "parent_label": "European folk music",
+                "relation_type": "P279",
+                "item_url": "https://www.wikidata.org/wiki/Q1361992",
+                "parent_url": "https://www.wikidata.org/wiki/Q98528192",
+                "is_regional_overview": False,
+                "classification_reason": None,
+            },
+        ]
+    ).write_parquet(genre_classification_path)
+    indigenous_to_path = _write_indigenous_to(tmp_path)
+    manual_overrides_path = tmp_path / "manual_regional_overrides.csv"
+    pl.DataFrame(
+        {"item_id": [], "item_label": [], "reason": [], "overview_item_id": []},
+        schema={"item_id": pl.Utf8, "item_label": pl.Utf8, "reason": pl.Utf8, "overview_item_id": pl.Utf8},
+    ).write_csv(manual_overrides_path)
+    output_dir = tmp_path / "silver"
+
+    result = sr.classify_regional_genres(
+        genre_classification_path, indigenous_to_path, manual_overrides_path, output_dir
+    )
+
+    df = pl.read_parquet(result)
+    by_item = {row["item_id"]: (row["is_regional"], row["regional_reason"]) for row in df.unique("item_id").to_dicts()}
+    assert by_item == {
+        "Q98528192": (True, "seed"),
+        "Q1361992": (True, "direct"),
+    }
+
+
 def test_classify_regional_genres_nests_override_under_overview_item(tmp_path: Path) -> None:
     genre_classification_path = _write_genre_classification(tmp_path)
     indigenous_to_path = _write_indigenous_to(tmp_path)

@@ -15,6 +15,7 @@ from wikidata.silver.item_links import add_item_links
 from wikidata.silver.regional_classification import MANUAL_OVERRIDES_PATH, classify_regional_genres
 from wikidata.silver.regional_overview_classification import (
     MANUAL_OVERVIEW_ADDITIONS_PATH,
+    MANUAL_OVERVIEW_RECLASSIFICATIONS_PATH,
     classify_regional_from_overviews,
 )
 
@@ -24,7 +25,7 @@ bronze_dir = resolve_pipeline_path(wikidata.__file__, require_env("BRONZE_OUTPUT
 silver_dir = resolve_pipeline_path(wikidata.__file__, require_env("SILVER_OUTPUT_DIR"))
 item_links_path = add_item_links(bronze_dir / "wikidata_genre_tree.parquet", silver_dir)
 regional_overview_classification_path = classify_regional_from_overviews(
-    item_links_path, MANUAL_OVERVIEW_ADDITIONS_PATH, silver_dir
+    item_links_path, MANUAL_OVERVIEW_ADDITIONS_PATH, MANUAL_OVERVIEW_RECLASSIFICATIONS_PATH, silver_dir
 )
 regional_classification_path = classify_regional_genres(
     regional_overview_classification_path,

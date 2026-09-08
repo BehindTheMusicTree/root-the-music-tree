@@ -3,6 +3,8 @@ from pathlib import Path
 
 import polars as pl
 
+from wikidata.silver.regional_overview_classification import MANUAL_OVERVIEW_RECLASSIFICATION_REASON
+
 logger = logging.getLogger(__name__)
 
 WIKIDATA_ITEM_URL_PREFIX = "https://www.wikidata.org/wiki/"
@@ -103,23 +105,28 @@ def classify_regional_genres(
     manual_override_ids = set(manual_overrides.select("item_id").unique().to_series())
     df = _apply_overview_overrides(df, manual_overrides)
 
-    # Seeds: the "music of <place>" items themselves, plus every item Wikidata's P2341
-    # ("indigenous to") flags as belonging to a specific people (e.g. "Han Chinese music" -> "Han
-    # Chinese people", see bronze wikidata_genre_indigenous_to.parquet), plus anything a data
-    # expert has hand-flagged in manual_regional_overrides.csv for genres none of the automated
-    # sources catch. P495 ("country of origin") is deliberately not used as a seed source: it's set
-    # on broad canonical umbrella genres too (jazz -> United States, heavy metal music -> United
-    # Kingdom), which would wrongly cascade regional status onto their real subgenres. All three
-    # remaining sets are tagged non-genre or nationally/ethnically-specific in their own right but
-    # are not excluded from the regional graph — they're regional genre nodes themselves (see
-    # hierarchy.py), and together form the seed set every other regional flag propagates from. A
-    # genre item is "direct" regional if any one of its parent edges points at a seed — not all of
-    # them, since e.g. "European folk music" has one parent into "music of Europe" (a seed) and
-    # another into "traditional folk music" (clean), and is still considered regional. Regional
-    # status then cascades to children layer by layer: any genre item with a parent edge into an
-    # already-regional item is "inherited" regional, repeated until no new items are found.
+    # Seeds: the "music of <place>" items themselves (plus items reclassified into that same
+    # non-genre-overview role via manual_overview_reclassifications.csv, e.g. "European folk music"
+    # — see regional_overview_classification.py), plus every item Wikidata's P2341 ("indigenous to")
+    # flags as belonging to a specific people (e.g. "Han Chinese music" -> "Han Chinese people", see
+    # bronze wikidata_genre_indigenous_to.parquet), plus anything a data expert has hand-flagged in
+    # manual_regional_overrides.csv for genres none of the automated sources catch. P495 ("country of
+    # origin") is deliberately not used as a seed source: it's set on broad canonical umbrella genres
+    # too (jazz -> United States, heavy metal music -> United Kingdom), which would wrongly cascade
+    # regional status onto their real subgenres. All remaining sets are tagged non-genre or
+    # nationally/ethnically-specific in their own right but are not excluded from the regional graph
+    # — they're regional genre nodes themselves (see hierarchy.py), and together form the seed set
+    # every other regional flag propagates from. A genre item is "direct" regional if any one of its
+    # parent edges points at a seed — not all of them, since e.g. "Australian rock" has one parent
+    # into "rock music" (clean) and another into "music of Australia" (a seed), and is still
+    # considered regional. Regional status then cascades to children layer by layer: any genre item
+    # with a parent edge into an already-regional item is "inherited" regional, repeated until no new
+    # items are found.
     seed_ids = set(
-        df.filter(pl.col("classification_reason") == "regional_overview").select("item_id").unique().to_series()
+        df.filter(pl.col("classification_reason").is_in(["regional_overview", MANUAL_OVERVIEW_RECLASSIFICATION_REASON]))
+        .select("item_id")
+        .unique()
+        .to_series()
     )
     source_ids = seed_ids | indigenous_ids | manual_override_ids
     direct_ids = set(

@@ -20,10 +20,11 @@ pipeline. See [SCHEMA.md](SCHEMA.md) for column definitions and data profiles.
       - [2.1.2 `classification_reason` values](#212-classification_reason-values)
       - [2.1.3 Auto-promotion of orphan `"music of "` parents](#213-auto-promotion-of-orphan-music-of--parents)
       - [2.1.4 Manual addition of overview items missing from Bronze entirely](#214-manual-addition-of-overview-items-missing-from-bronze-entirely)
-      - [2.1.5 Scope of this first pass](#215-scope-of-this-first-pass)
+      - [2.1.5 Manual reclassification of existing items as overview](#215-manual-reclassification-of-existing-items-as-overview)
+      - [2.1.6 Scope of this first pass](#216-scope-of-this-first-pass)
     - [2.2 3_regional_classification](#22-3_regional_classification)
       - [2.2.1 Inputs](#221-inputs)
-      - [2.2.2 Rule: three seed sources](#222-rule-three-seed-sources)
+      - [2.2.2 Rule: four seed sources](#222-rule-four-seed-sources)
       - [2.2.3 Cascade](#223-cascade)
     - [2.3 4_genre_parents](#23-4_genre_parents)
       - [2.3.1 `manual_canonical_parents.csv` backstop](#231-manual_canonical_parentscsv-backstop)
@@ -119,9 +120,10 @@ hierarchy or genre-matching built on top of this data.
 
 #### 2.1.2 `classification_reason` values
 
-| Value               | Rule                                   | Rationale                                                                                                                                                                                |
-| ------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `regional_overview` | `item_label` starts with `"music of "` | Wikidata's national/regional music overview articles (e.g. "music of France", "music of Kenya") — ~300 of ~6,300 items as of this writing, always this exact prefix, never a genre name. |
+| Value                              | Rule                                                                  | Rationale                                                                                                                                                                                   |
+| ----------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `regional_overview`                | `item_label` starts with `"music of "`                               | Wikidata's national/regional music overview articles (e.g. "music of France", "music of Kenya") — ~300 of ~6,300 items as of this writing, always this exact prefix, never a genre name. |
+| `manual_overview_reclassification` | `item_id` listed in `manual_overview_reclassifications.csv`          | An existing genre item (already has its own Bronze row and a real `P279`/`P361` parent) that a data expert has decided plays the same non-genre regional-overview role despite not carrying the `"music of "` label prefix — see [2.1.5](#215-manual-reclassification-of-existing-items-as-overview). |
 
 This tags, it does not exclude: `regional_overview` items stay in every downstream Parquet file
 and are the seed set [`2.2 3_regional_classification`](#22-3_regional_classification) propagates
@@ -176,7 +178,37 @@ is allowed as a last resort when no matching real Wikidata "music of `<place>`" 
 `item_label` to start with `"music of "`; their `item_url` is built the same way as any other row
 and simply won't resolve to a real Wikidata page.
 
-#### 2.1.5 Scope of this first pass
+#### 2.1.5 Manual reclassification of existing items as overview
+
+Unlike 2.1.4's case, some items are the opposite problem: they already have their own row in
+Bronze/`1_item_links` (usually with a real `P279`/`P361` parent edge, making them look like an
+ordinary genre) but a data expert has decided the item actually functions as a non-genre regional
+overview node — it just doesn't carry the `"music of "` label prefix the automated rule keys off
+of. "European folk music" (`Q98528192`) is the motivating example: a continent-wide folk-music
+umbrella that is parent to dozens of national folk genres (Hungarian folk music, Nordic folk
+music, ...), functionally identical to a "music of Europe" overview item, but named without the
+prefix.
+
+`manual_overview_reclassifications.csv`
+(`src/wikidata/silver/manual_overview_reclassifications.csv`, git-tracked, hand-curated — columns
+`item_id,item_label,reason`) is the backstop for this case: a data expert lists the item's QID and
+current label, and this step flags it `is_regional_overview = True` /
+`classification_reason = "manual_overview_reclassification"` directly, without touching its label.
+
+This is the mirror image of `manual_regional_overview_additions.csv` in every validation rule:
+`item_label` here does **not** need the `"music of "` prefix (that's the whole point — these are
+exactly the items the prefix rule misses), but `item_id` **must** already be present in the genre
+tree with a matching `item_label`, and must not already be flagged `is_regional_overview` by the
+prefix rule (nothing to reclassify in that case). As usual, the pipeline fails fast on any row that
+violates these constraints, on blank `item_id`/`item_label`, or on duplicate `item_id` rows.
+
+Reclassifying an item this way excludes it from `5_hierarchy` as a canonical genre — it becomes a
+scaffolding node in `5_regional_hierarchy` only, the same as any other `regional_overview` item.
+It's also included in `3_regional_classification`'s seed set (see
+[2.2.2](#222-rule-four-seed-sources)), so regional status still cascades correctly to its
+children.
+
+#### 2.1.6 Scope of this first pass
 
 This is a first classification pass covering the single highest-confidence, most mechanical rule
 found during analysis. Other non-genre categories are known to exist in the Bronze data (musical
@@ -200,13 +232,16 @@ Bronze `wikidata_genre_country_of_origin.parquet` (`P495`, "country of origin") 
 canonical umbrella genres too, e.g. jazz, heavy metal music, which would wrongly cascade regional
 status onto their real subgenres).
 
-#### 2.2.2 Rule: three seed sources
+#### 2.2.2 Rule: four seed sources
 
-Three kinds of items seed the regional graph and are themselves flagged `is_regional = True`, not
+Four kinds of items seed the regional graph and are themselves flagged `is_regional = True`, not
 merely a launching point for other items:
 
 - `regional_overview` items (from `2_regional_overview_classification`, e.g. "music of Kenya",
-  "music of Cape Verde") — `regional_reason = "seed"`.
+  "music of Cape Verde"), including items reclassified into that same role via
+  `manual_overview_reclassifications.csv` despite not carrying the `"music of "` prefix (e.g.
+  "European folk music" — see [2.1.5](#215-manual-reclassification-of-existing-items-as-overview))
+  — `regional_reason = "seed"`.
 - Items with at least one `P2341` ("indigenous to") value in Bronze
   `wikidata_genre_indigenous_to.parquet` (e.g. "Han Chinese music") — `regional_reason =
   "indigenous_to"`. Unlike `regional_overview` seeds these are ordinary genre items, not non-genre
@@ -237,9 +272,9 @@ reaches regional status via an already-flagged parent that isn't itself a seed.
 
 > ⚠️ **ANY-parent, not ALL-parent — confirmed by a real multi-parent case.** A naive "every parent
 > trail dead-ends in a seed" rule would miss real regional genres that also happen to have a clean
-> secondary parent: "Portuguese folk music" has one parent edge into "music of Portugal" (a seed)
-> and another into "European folk music" (not a seed) — live data confirms "European folk music"
-> is itself also considered a regional genre.
+> secondary parent: "Australian rock" has one parent edge into "rock music" (a clean canonical
+> genre, no regional signal) and another into "music of Australia" (a seed) — live data confirms
+> it's still correctly flagged regional.
 >
 > Having _any_ parent edge into a regional item is sufficient, regardless of whether the item also
 > has a clean parent elsewhere. This structural rule alone catches both "morna" (direct seed hit)
