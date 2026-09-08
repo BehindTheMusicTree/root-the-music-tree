@@ -39,12 +39,23 @@ def _write_manual_additions(tmp_path: Path, rows: list[dict] | None = None) -> P
     return manual_additions_path
 
 
+def _write_reclassifications(tmp_path: Path, rows: list[dict] | None = None) -> Path:
+    reclassifications_path = tmp_path / "manual_overview_reclassifications.csv"
+    pl.DataFrame(rows or [], schema={"item_id": pl.Utf8, "item_label": pl.Utf8, "reason": pl.Utf8}).write_csv(
+        reclassifications_path
+    )
+    return reclassifications_path
+
+
 def test_classify_regional_from_overviews_flags_regional_overview_items(tmp_path: Path) -> None:
     item_links_path = _write_item_links(tmp_path)
     manual_additions_path = _write_manual_additions(tmp_path)
     output_dir = tmp_path / "silver"
+    reclassifications_path = _write_reclassifications(tmp_path)
 
-    result = sc.classify_regional_from_overviews(item_links_path, manual_additions_path, output_dir)
+    result = sc.classify_regional_from_overviews(
+        item_links_path, manual_additions_path, reclassifications_path, output_dir
+    )
 
     assert result == output_dir / "2_regional_overview_classification.parquet"
     rows = pl.read_parquet(result).sort("item_id").to_dicts()
@@ -76,8 +87,9 @@ def test_classify_regional_from_overviews_creates_output_dir(tmp_path: Path) -> 
     item_links_path = _write_item_links(tmp_path)
     manual_additions_path = _write_manual_additions(tmp_path)
     output_dir = tmp_path / "does" / "not" / "exist"
+    reclassifications_path = _write_reclassifications(tmp_path)
 
-    sc.classify_regional_from_overviews(item_links_path, manual_additions_path, output_dir)
+    sc.classify_regional_from_overviews(item_links_path, manual_additions_path, reclassifications_path, output_dir)
 
     assert output_dir.is_dir()
 
@@ -99,8 +111,11 @@ def test_classify_regional_from_overviews_promotes_orphan_music_of_parent(tmp_pa
     ).write_parquet(item_links_path)
     manual_additions_path = _write_manual_additions(tmp_path)
     output_dir = tmp_path / "silver"
+    reclassifications_path = _write_reclassifications(tmp_path)
 
-    result = sc.classify_regional_from_overviews(item_links_path, manual_additions_path, output_dir)
+    result = sc.classify_regional_from_overviews(
+        item_links_path, manual_additions_path, reclassifications_path, output_dir
+    )
 
     rows = pl.read_parquet(result).sort("item_id").to_dicts()
     promoted = next(row for row in rows if row["item_id"] == "Q6942327")
@@ -129,8 +144,11 @@ def test_classify_regional_from_overviews_adds_manual_overview_item_missing_from
         ],
     )
     output_dir = tmp_path / "silver"
+    reclassifications_path = _write_reclassifications(tmp_path)
 
-    result = sc.classify_regional_from_overviews(item_links_path, manual_additions_path, output_dir)
+    result = sc.classify_regional_from_overviews(
+        item_links_path, manual_additions_path, reclassifications_path, output_dir
+    )
 
     rows = pl.read_parquet(result).sort("item_id").to_dicts()
     added = next(row for row in rows if row["item_id"] == "Q16147503")
@@ -159,8 +177,11 @@ def test_classify_regional_from_overviews_adds_manual_overview_item_with_synthet
         ],
     )
     output_dir = tmp_path / "silver"
+    reclassifications_path = _write_reclassifications(tmp_path)
 
-    result = sc.classify_regional_from_overviews(item_links_path, manual_additions_path, output_dir)
+    result = sc.classify_regional_from_overviews(
+        item_links_path, manual_additions_path, reclassifications_path, output_dir
+    )
 
     rows = pl.read_parquet(result).sort("item_id").to_dicts()
     added = next(row for row in rows if row["item_id"] == "LOCAL:indigenous-americas")
@@ -182,9 +203,10 @@ def test_classify_regional_from_overviews_rejects_manual_addition_without_music_
         tmp_path, [{"item_id": "Q1", "item_label": "not a regional overview", "reason": "bad row"}]
     )
     output_dir = tmp_path / "silver"
+    reclassifications_path = _write_reclassifications(tmp_path)
 
     with pytest.raises(ValueError, match="item_label"):
-        sc.classify_regional_from_overviews(item_links_path, manual_additions_path, output_dir)
+        sc.classify_regional_from_overviews(item_links_path, manual_additions_path, reclassifications_path, output_dir)
 
 
 def test_classify_regional_from_overviews_rejects_manual_addition_with_blank_item_label(tmp_path: Path) -> None:
@@ -193,9 +215,10 @@ def test_classify_regional_from_overviews_rejects_manual_addition_with_blank_ite
         tmp_path, [{"item_id": "Q1", "item_label": None, "reason": "bad row"}]
     )
     output_dir = tmp_path / "silver"
+    reclassifications_path = _write_reclassifications(tmp_path)
 
     with pytest.raises(ValueError, match="blank"):
-        sc.classify_regional_from_overviews(item_links_path, manual_additions_path, output_dir)
+        sc.classify_regional_from_overviews(item_links_path, manual_additions_path, reclassifications_path, output_dir)
 
 
 def test_classify_regional_from_overviews_rejects_manual_addition_with_empty_item_label(tmp_path: Path) -> None:
@@ -204,9 +227,10 @@ def test_classify_regional_from_overviews_rejects_manual_addition_with_empty_ite
         tmp_path, [{"item_id": "Q1", "item_label": "  ", "reason": "bad row"}]
     )
     output_dir = tmp_path / "silver"
+    reclassifications_path = _write_reclassifications(tmp_path)
 
     with pytest.raises(ValueError, match="blank"):
-        sc.classify_regional_from_overviews(item_links_path, manual_additions_path, output_dir)
+        sc.classify_regional_from_overviews(item_links_path, manual_additions_path, reclassifications_path, output_dir)
 
 
 def test_classify_regional_from_overviews_rejects_manual_addition_with_empty_item_id(tmp_path: Path) -> None:
@@ -215,9 +239,10 @@ def test_classify_regional_from_overviews_rejects_manual_addition_with_empty_ite
         tmp_path, [{"item_id": "", "item_label": "music of nowhere", "reason": "bad row"}]
     )
     output_dir = tmp_path / "silver"
+    reclassifications_path = _write_reclassifications(tmp_path)
 
     with pytest.raises(ValueError, match="blank"):
-        sc.classify_regional_from_overviews(item_links_path, manual_additions_path, output_dir)
+        sc.classify_regional_from_overviews(item_links_path, manual_additions_path, reclassifications_path, output_dir)
 
 
 def test_classify_regional_from_overviews_rejects_manual_addition_already_in_bronze(tmp_path: Path) -> None:
@@ -226,9 +251,10 @@ def test_classify_regional_from_overviews_rejects_manual_addition_already_in_bro
         tmp_path, [{"item_id": "Q3868594", "item_label": "music of Kenya", "reason": "already present"}]
     )
     output_dir = tmp_path / "silver"
+    reclassifications_path = _write_reclassifications(tmp_path)
 
     with pytest.raises(ValueError, match="already present"):
-        sc.classify_regional_from_overviews(item_links_path, manual_additions_path, output_dir)
+        sc.classify_regional_from_overviews(item_links_path, manual_additions_path, reclassifications_path, output_dir)
 
 
 def test_classify_regional_from_overviews_rejects_manual_addition_already_in_bronze_with_whitespace(
@@ -239,6 +265,61 @@ def test_classify_regional_from_overviews_rejects_manual_addition_already_in_bro
         tmp_path, [{"item_id": " Q3868594 ", "item_label": " music of Kenya ", "reason": "already present"}]
     )
     output_dir = tmp_path / "silver"
+    reclassifications_path = _write_reclassifications(tmp_path)
 
     with pytest.raises(ValueError, match="already present"):
-        sc.classify_regional_from_overviews(item_links_path, manual_additions_path, output_dir)
+        sc.classify_regional_from_overviews(item_links_path, manual_additions_path, reclassifications_path, output_dir)
+
+
+def test_classify_regional_from_overviews_reclassifies_existing_item_as_overview(tmp_path: Path) -> None:
+    item_links_path = _write_item_links(tmp_path)
+    manual_additions_path = _write_manual_additions(tmp_path)
+    reclassifications_path = _write_reclassifications(
+        tmp_path, [{"item_id": "Q11399", "item_label": "rock music", "reason": "test reclassification"}]
+    )
+    output_dir = tmp_path / "silver"
+
+    result = sc.classify_regional_from_overviews(
+        item_links_path, manual_additions_path, reclassifications_path, output_dir
+    )
+
+    rows = pl.read_parquet(result).sort("item_id").to_dicts()
+    reclassified = next(row for row in rows if row["item_id"] == "Q11399")
+    assert reclassified["is_regional_overview"] is True
+    assert reclassified["classification_reason"] == "manual_overview_reclassification"
+
+
+def test_classify_regional_from_overviews_rejects_reclassification_of_unknown_item(tmp_path: Path) -> None:
+    item_links_path = _write_item_links(tmp_path)
+    manual_additions_path = _write_manual_additions(tmp_path)
+    reclassifications_path = _write_reclassifications(
+        tmp_path, [{"item_id": "Q999999", "item_label": "not in the tree", "reason": "bad row"}]
+    )
+    output_dir = tmp_path / "silver"
+
+    with pytest.raises(ValueError, match="not found in the genre tree"):
+        sc.classify_regional_from_overviews(item_links_path, manual_additions_path, reclassifications_path, output_dir)
+
+
+def test_classify_regional_from_overviews_rejects_reclassification_with_mismatched_label(tmp_path: Path) -> None:
+    item_links_path = _write_item_links(tmp_path)
+    manual_additions_path = _write_manual_additions(tmp_path)
+    reclassifications_path = _write_reclassifications(
+        tmp_path, [{"item_id": "Q11399", "item_label": "wrong label", "reason": "bad row"}]
+    )
+    output_dir = tmp_path / "silver"
+
+    with pytest.raises(ValueError, match="item_label"):
+        sc.classify_regional_from_overviews(item_links_path, manual_additions_path, reclassifications_path, output_dir)
+
+
+def test_classify_regional_from_overviews_rejects_reclassification_already_flagged_overview(tmp_path: Path) -> None:
+    item_links_path = _write_item_links(tmp_path)
+    manual_additions_path = _write_manual_additions(tmp_path)
+    reclassifications_path = _write_reclassifications(
+        tmp_path, [{"item_id": "Q3868594", "item_label": "music of Kenya", "reason": "redundant"}]
+    )
+    output_dir = tmp_path / "silver"
+
+    with pytest.raises(ValueError, match="already flagged is_regional_overview"):
+        sc.classify_regional_from_overviews(item_links_path, manual_additions_path, reclassifications_path, output_dir)
