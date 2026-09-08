@@ -323,3 +323,43 @@ def test_classify_regional_from_overviews_rejects_reclassification_already_flagg
 
     with pytest.raises(ValueError, match="already flagged is_regional_overview"):
         sc.classify_regional_from_overviews(item_links_path, manual_additions_path, reclassifications_path, output_dir)
+
+
+def test_classify_regional_from_overviews_rejects_reclassification_with_blank_item_label(tmp_path: Path) -> None:
+    item_links_path = _write_item_links(tmp_path)
+    manual_additions_path = _write_manual_additions(tmp_path)
+    reclassifications_path = _write_reclassifications(
+        tmp_path, [{"item_id": "Q11399", "item_label": "  ", "reason": "bad row"}]
+    )
+    output_dir = tmp_path / "silver"
+
+    with pytest.raises(ValueError, match="blank"):
+        sc.classify_regional_from_overviews(item_links_path, manual_additions_path, reclassifications_path, output_dir)
+
+
+def test_classify_regional_from_overviews_rejects_reclassification_with_blank_item_id(tmp_path: Path) -> None:
+    item_links_path = _write_item_links(tmp_path)
+    manual_additions_path = _write_manual_additions(tmp_path)
+    reclassifications_path = _write_reclassifications(
+        tmp_path, [{"item_id": "", "item_label": "rock music", "reason": "bad row"}]
+    )
+    output_dir = tmp_path / "silver"
+
+    with pytest.raises(ValueError, match="blank"):
+        sc.classify_regional_from_overviews(item_links_path, manual_additions_path, reclassifications_path, output_dir)
+
+
+def test_classify_regional_from_overviews_rejects_duplicate_reclassification_item_id(tmp_path: Path) -> None:
+    item_links_path = _write_item_links(tmp_path)
+    manual_additions_path = _write_manual_additions(tmp_path)
+    reclassifications_path = _write_reclassifications(
+        tmp_path,
+        [
+            {"item_id": "Q11399", "item_label": "rock music", "reason": "test reclassification"},
+            {"item_id": "Q11399", "item_label": "rock music", "reason": "duplicate row"},
+        ],
+    )
+    output_dir = tmp_path / "silver"
+
+    with pytest.raises(ValueError, match="duplicate item_id"):
+        sc.classify_regional_from_overviews(item_links_path, manual_additions_path, reclassifications_path, output_dir)
