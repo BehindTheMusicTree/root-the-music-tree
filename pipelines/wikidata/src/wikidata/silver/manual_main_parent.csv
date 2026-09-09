@@ -31,3 +31,38 @@ Q3328779,urban classical music,root item with no P279/P361 parent; a classical/u
 Q7663873,Systems music,"root item with no P279/P361 parent; a minimalist-adjacent British compositional movement (e.g. Gavin Bryars, Michael Nyman) with no single national/ethnic home so manual_regional_overrides.csv does not apply",Q12183214
 Q8195422,dance,"root item with no P279/P361 parent; described only as ""a piece of music with a dance rhythm"", effectively the same concept as the existing dance music item, with no single national/ethnic home so manual_regional_overrides.csv does not apply",Q316930
 Q133687529,toypop,"root item with two P279 parents (popular music, J-pop); the lowest-QID heuristic picks popular music but J-pop is the correct main parent for this Japanese children's music genre",Q131578
+Q16002495,algorave,root item with no P279/P361 parent; a live-coded electronic music subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q9778
+Q96740854,bass music,root item with no P279/P361 parent; an electronic music subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q9778
+Q2047694,cantiones natalitiæ,root item with no P279/P361 parent; a Neo-Latin Christmas-carol subtype with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q21653344
+Q1379958,contemporary Christian music,root item with no P279/P361 parent; a Christian music subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q6452410
+Q1339121,contemporary worship music,root item with no P279/P361 parent; a Christian music subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q6452410
+Q28502375,cumbión,root item with no P279/P361 parent; a cumbia-derivative genre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q97276030
+Q106922571,cybergoth music,root item with no P279/P361 parent; a gothic music subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q13646229
+Q1166158,dark cabaret,root item with no P279/P361 parent; a cabaret music subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q111535905
+Q65937876,glam music,root item with no P279/P361 parent; a rock music subgenre/movement with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q11399
+Q1100989,glitch,root item with no P279/P361 parent; an electronic music subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q9778
+Q2743,musical play,root item with no P279/P361 parent; a musical theater subtype with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q1370345
+Q783874,nasheed,root item with no P279/P361 parent; an Islamic music subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q1482325
+Q137300740,programmatic symphony,root item with no P279/P361 parent; a programme music subtype with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q209741
+Q3071,punk rock,root item with no P279/P361 parent; a rock music subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q11399
+Q123272631,rock poetry,root item with no P279/P361 parent; a rock music subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q11399
+Q7410145,sampledelia,root item with no P279/P361 parent; a sample-based electronic music subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q9778
+Q1077388,sentimental ballad,root item with no P279/P361 parent; a ballad subtype with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q116690343
+Q661651,show tune,root item with no P279/P361 parent; a musical theater subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q1370345
+Q15733887,vaporwave,root item with no P279/P361 parent; an electronic music subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q9778
+Q3296134,wizard rock,root item with no P279/P361 parent; a rock music subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q11399
+Q2519962,youth crew,root item with no P279/P361 parent; a hardcore subgenre/movement with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q11974316
+Q310871,lowercase,root item with no P279/P361 parent; a minimalist microsound electronic music subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q9778
+Q98528203,experimental big band,root item with no P279/P361 parent; a jazz subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q8341
+Q7361853,Roman Catholic Marian music,root item with no P279/P361 parent; a Christian music subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q6452410
+Q1684532,jazz guitar,root item with no P279/P361 parent; a jazz subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q65937893
+Q6168405,jazz poetry,root item with no P279/P361 parent; a jazz-adjacent poetry genre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q8341
+Q11964168,crabcore,root item with no P279/P361 parent; an electronicore subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q2084353
+Q11899500,underground metal,root item with no P279/P361 parent; a metal-music subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q12326776
+Q7883674,underground dance music,root item with no P279/P361 parent; a club/dance-music subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q11787389
+Q19672555,nerd-folk,root item with no P279/P361 parent; a contemporary-folk subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q106298881
+Q1414130,filk,root item with no P279/P361 parent; a nerd-folk subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q19672555
+Q110592389,contemporary singer-songwriter music,root item with no P279/P361 parent; a singer-songwriter-music subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q89363113
+Q16912992,stepenny,"root item with no P279/P361 parent; a Slavic Orthodox liturgical hymn genre spanning multiple Slavic nations so manual_regional_overrides.csv does not apply, but Slavic rite song already exists as its real parent genre",Q16682190
+Q108539884,stomp and flutter,root item with no P279/P361 parent; an indie-folk microgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q1317816
+Q55614428,indigenous metal music,root item with no P279/P361 parent; a heavy-metal subgenre defined by theme/performers rather than one nation so manual_regional_overrides.csv does not apply,Q38848

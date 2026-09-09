@@ -46,3 +46,4 @@ Q2746731,parody music,"organized around a parody theme, subclass of comedy music
 Q1151663,novelty music,"organized around a comic/farcical theme, subclass of comedy music, not a geography or musical style"
 Q829147,protest song,"organized around a protest/social-change theme, subclass of topical song, not a geography or musical style"
 Q23817363,parody song,distinct QID from parody music but same thematic concept typed at the song level; matches classification of Q2746731
+Q15907187,carnival song,"organized around a seasonal/festival-occasion theme (Carnival), not a geography/ethnicity/musical style"
