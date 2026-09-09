@@ -17,7 +17,6 @@ Q51560345,intuitive folk,root item with no P279/P361 parent; a folk subgenre coi
 Q2104307,popular classical,root item with no P279/P361 parent; a classical/popular crossover genre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q56342556
 Q18207423,rhythm & praise music,root item with no P279/P361 parent; a Christian R&B/gospel subgenre (from a term coined by gospel duo Dawkins and Dawkins) with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q180268
 Q136908397,post-noise,root item with no P279/P361 parent; a noise music subgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q726239
-Q11074326,suspense music,root item with no P279/P361 parent; a film-scoring genre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q492264
 Q3624086,acousmatic art,root item with no P279/P361 parent; an electroacoustic/musique concrète-derived art form with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q1640319
 Q2621235,spatial music,"root item with no P279/P361 parent; composed music that intentionally exploits sound localization, with no single national/ethnic home so manual_regional_overrides.csv does not apply",Q1640319
 Q4448560,surrealist music,root item with no P279/P361 parent; an early-20th-century avant-garde compositional movement with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q2332751
@@ -66,3 +65,8 @@ Q110592389,contemporary singer-songwriter music,root item with no P279/P361 pare
 Q16912992,stepenny,"root item with no P279/P361 parent; a Slavic Orthodox liturgical hymn genre spanning multiple Slavic nations so manual_regional_overrides.csv does not apply, but Slavic rite song already exists as its real parent genre",Q16682190
 Q108539884,stomp and flutter,root item with no P279/P361 parent; an indie-folk microgenre with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q1317816
 Q55614428,indigenous metal music,root item with no P279/P361 parent; a heavy-metal subgenre defined by theme/performers rather than one nation so manual_regional_overrides.csv does not apply,Q38848
+Q130479301,Christian children's music,root item with no P279/P361 parent; a Christian-music subtype for a child audience with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q6452410
+Q856713,Christian hymn,root item with no P279/P361 parent; a Christian hymn form with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q6452410
+Q1293057,Protestant hymn,root item with no P279/P361 parent; a Christian hymn subtype with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q6452410
+Q107029644,Hari Raya music,root item with no P279/P361 parent; music for the Islamic Eid/Hari Raya holiday with no single national/ethnic home so manual_regional_overrides.csv does not apply,Q1482325
+Q7139757,Parranda,"confirmed via WebSearch: a Christmas caroling tradition spanning multiple Caribbean nations (Puerto Rico, Venezuela, Cuba, Trinidad) with no single national/ethnic home so manual_regional_overrides.csv does not apply; nests under carol",Q21653344

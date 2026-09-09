@@ -633,3 +633,7 @@ Q1062328,chanson,"root item with no P279/P361 parent and no P2341/P495 value, bu
 Q281111,ghazal,"root item with no P279/P361 parent; ambiguous across India/Pakistan/Iran/Turkey, user-directed to the Persian-world nation-state overview after AskUserQuestion disambiguation",Q1672398
 Q7139128,parlour music,"root item with no P279/P361 parent; 19th-c. Western domestic-music tradition spanning both the UK and US, user-directed to the Anglo-American synthetic overview after AskUserQuestion disambiguation",LOCAL:anglo-american-music
 Q2369761,salon music,"root item with no P279/P361 parent; pan-European 19th-c. salon tradition (France/Germany/Austria), user-directed to the Europe overview after AskUserQuestion disambiguation",Q3328676
+Q7179597,Peyote song,"confirmed via WebSearch: ceremonial music of the Native American Church, spanning many indigenous nations with no single country of origin",LOCAL:indigenous-americas
+Q7251113,Prostopinije,"Ruthenian/Byzantine Rite plainchant tradition, a religious rather than national/ethnic classification",LOCAL:eastern-orthodox-chant
+Q16682190,Slavic rite song,"Slavic Byzantine Rite liturgical chant tradition, a religious rather than national/ethnic classification",LOCAL:eastern-orthodox-chant
+Q18242331,candomblé song,song of the Afro-Brazilian Candomblé religious tradition,Q899215
