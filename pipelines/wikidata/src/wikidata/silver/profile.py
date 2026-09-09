@@ -92,5 +92,5 @@ if __name__ == "__main__":
     profile_hierarchy(
         silver_dir / "5_canonical_parents.parquet",
         silver_dir / "6_canonical_hierarchy.parquet",
-        silver_dir / "6_regional_hierarchy.parquet",
+        silver_dir / "7_regional_hierarchy.parquet",
     )

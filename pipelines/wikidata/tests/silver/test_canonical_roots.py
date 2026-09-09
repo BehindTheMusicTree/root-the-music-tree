@@ -61,7 +61,7 @@ def test_extract_canonical_roots_keeps_only_parentless_items(tmp_path: Path) -> 
 
     result = sr.extract_canonical_roots(hierarchy_path, output_dir)
 
-    assert result == output_dir / "7_canonical_roots.parquet"
+    assert result == output_dir / "8_canonical_roots.parquet"
     rows = pl.read_parquet(result).to_dicts()
     assert rows == [
         {

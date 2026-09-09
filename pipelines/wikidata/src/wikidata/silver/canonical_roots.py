@@ -19,7 +19,7 @@ def extract_canonical_roots(hierarchy_path: Path, output_dir: Path) -> Path:
     roots = df.filter(is_root).select("item_id", "item_label", "item_url").sort("item_label")
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / "7_canonical_roots.parquet"
+    output_path = output_dir / "8_canonical_roots.parquet"
     roots.write_parquet(output_path)
     logger.info("wrote %d rows to %s", roots.height, output_path)
 
