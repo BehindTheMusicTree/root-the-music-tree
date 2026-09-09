@@ -644,3 +644,5 @@ Q4198071,Hiérodrame,root item with no P279/P361 parent; an 18th-century French 
 Q663979,glee,root item with no P279/P361 parent; an English part-song genre missed by the automated seed/indigenous_to/country_of_origin classification,Q110558058
 Q1620760,historia,root item with no P279/P361 parent; a German/Lutheran liturgical narrative genre missed by the automated seed/indigenous_to/country_of_origin classification,Q2743758
 Q79891737,Carpathian plainchant,root item with no P279/P361 parent; Carpatho-Rusyn liturgical chant tradition spanning Ukraine/Slovakia/Poland with no single modern national home; user requested the Eastern Orthodox umbrella,LOCAL:eastern-orthodox-chant
+Q111535905,cabaret music,"root item with no P279/P361 parent; a theatrical genre with strong ties to specific European scenes (French cabaret, German Kabarett) but no single modern national home; user requested a European umbrella",Q3328676
+Q6543501,Oppari,root item with no P279/P361 parent; a Tamil funeral lament genre missed by the automated seed/indigenous_to/country_of_origin classification,Q17070502
