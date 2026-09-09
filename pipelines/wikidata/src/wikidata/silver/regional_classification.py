@@ -20,6 +20,117 @@ WIKIDATA_ITEM_URL_PREFIX = "https://www.wikidata.org/wiki/"
 # regional tree instead of sitting under their region. See DESIGN.md#23-4_regional_classification.
 MANUAL_OVERRIDES_PATH = Path(__file__).parent / "manual_regional_overrides.csv"
 
+# Committed alongside the code (not a gitignored bronze/silver output) because it's hand-curated,
+# not fetched from Wikidata: a data expert's pick for an item's *main* parent (see
+# main_parent_selection.py), overriding whatever the automated lowest-QID heuristic would otherwise
+# pick among that item's candidate parent edges — or, for a genuinely parentless root, giving it a
+# parent it never had. Applied here, before the regional cascade below runs, so the injected edge is
+# just another edge to cascade through: is_regional flows to the child the same way it would through
+# a real Bronze edge (direct if the parent is itself a seed, inherited if the parent is already
+# regional via cascade, or the item stays canonical if the parent is too) — no separate validation of
+# the parent's regional-ness is needed, unlike a scheme that ran this after the cascade and had to
+# check the parent's flavor by hand. `parent_item_id` must reference another genre item already in
+# the tree; it must not be `is_regional_overview` (that's what manual_regional_overrides.csv, with
+# its overview_item_id column, is for). See DESIGN.md#24-5_canonical_parents.
+MANUAL_MAIN_PARENT_PATH = Path(__file__).parent / "manual_main_parent.csv"
+
+# Tags a synthetic edge injected from manual_main_parent.csv so main_parent_selection.py can prefer
+# it over the item's other candidate parent edges when picking a main parent.
+MANUAL_MAIN_PARENT_RELATION_TYPE = "manual_main_parent"
+
+
+def _apply_manual_main_parent(df: pl.DataFrame, manual_parents: pl.DataFrame) -> pl.DataFrame:
+    if "parent_item_id" not in manual_parents.columns:
+        raise ValueError("manual_main_parent.csv is missing the required 'parent_item_id' column")
+    if "item_id" not in manual_parents.columns:
+        raise ValueError("manual_main_parent.csv is missing the required 'item_id' column")
+    manual_parents = manual_parents.with_columns(
+        pl.col("item_id").cast(pl.Utf8).str.strip_chars(), pl.col("parent_item_id").cast(pl.Utf8)
+    )
+    blank_item_id = manual_parents.filter(pl.col("item_id").is_null() | (pl.col("item_id") == ""))
+    if not blank_item_id.is_empty():
+        raise ValueError("manual_main_parent.csv has row(s) with a null/blank 'item_id'")
+    missing = manual_parents.filter(
+        pl.col("parent_item_id").is_null() | (pl.col("parent_item_id").str.strip_chars() == "")
+    )
+    if not missing.is_empty():
+        missing_ids = missing.select("item_id").to_series().to_list()
+        raise ValueError(f"manual_main_parent.csv rows missing required 'parent_item_id': {missing_ids}")
+    overrides = manual_parents.with_columns(parent_item_id=pl.col("parent_item_id").str.strip_chars())
+
+    override_item_ids = overrides.select("item_id").to_series().to_list()
+    if len(override_item_ids) != len(set(override_item_ids)):
+        raise ValueError("manual_main_parent.csv contains duplicate item_id rows")
+
+    known_item_ids = set(df.select("item_id").unique().to_series())
+    unknown_item_ids = [
+        item_id for item_id in overrides.select("item_id").unique().to_series() if item_id not in known_item_ids
+    ]
+    if unknown_item_ids:
+        raise ValueError(
+            f"manual_main_parent.csv rows reference item_id(s) not found in the genre tree: {unknown_item_ids}"
+        )
+    unknown_parent_item_ids = [
+        parent_item_id
+        for parent_item_id in overrides.select("parent_item_id").unique().to_series()
+        if parent_item_id not in known_item_ids
+    ]
+    if unknown_parent_item_ids:
+        raise ValueError(
+            "manual_main_parent.csv rows reference parent_item_id(s) not found in the genre tree: "
+            f"{unknown_parent_item_ids}"
+        )
+    regional_overview_ids = set(df.filter(pl.col("is_regional_overview")).select("item_id").unique().to_series())
+    overview_parent_item_ids = [
+        parent_item_id
+        for parent_item_id in overrides.select("parent_item_id").unique().to_series()
+        if parent_item_id in regional_overview_ids
+    ]
+    if overview_parent_item_ids:
+        raise ValueError(
+            "manual_main_parent.csv rows reference parent_item_id(s) flagged is_regional_overview in the "
+            f"genre tree (use manual_regional_overrides.csv for those): {overview_parent_item_ids}"
+        )
+    overridden_ids = set(overrides.select("item_id").unique().to_series())
+    non_canonical_item_ids = sorted(
+        df.filter(pl.col("item_id").is_in(list(overridden_ids)) & pl.col("is_regional_overview"))
+        .select("item_id")
+        .unique()
+        .to_series()
+    )
+    if non_canonical_item_ids:
+        raise ValueError(
+            "manual_main_parent.csv rows reference item_id(s) flagged is_regional_overview in the genre "
+            f"tree — this backstop is not for overview items: {non_canonical_item_ids}"
+        )
+
+    parent_labels = (
+        df.select("item_id", "item_label")
+        .unique(subset="item_id")
+        .rename({"item_id": "parent_item_id", "item_label": "parent_item_label"})
+    )
+    item_columns = [c for c in df.columns if c not in ("parent_id", "parent_label", "parent_url", "relation_type")]
+    synthetic_edges = (
+        overrides.select("item_id", "parent_item_id")
+        .join(parent_labels, on="parent_item_id", how="left")
+        .join(df.select(item_columns).unique(subset="item_id"), on="item_id", how="left")
+        .with_columns(
+            parent_id=pl.col("parent_item_id"),
+            parent_label=pl.col("parent_item_label"),
+            parent_url=pl.lit(WIKIDATA_ITEM_URL_PREFIX) + pl.col("parent_item_id"),
+            relation_type=pl.lit(MANUAL_MAIN_PARENT_RELATION_TYPE),
+        )
+    )
+    if "has_parent_label" in df.columns:
+        synthetic_edges = synthetic_edges.with_columns(
+            has_parent_label=pl.col("parent_item_label").is_not_null()
+            & (pl.col("parent_item_label") != pl.col("parent_item_id"))
+        )
+    synthetic_edges = synthetic_edges.select(df.columns)
+
+    df = df.filter(~(pl.col("item_id").is_in(list(overridden_ids)) & pl.col("parent_id").is_null()))
+    return pl.concat([df, synthetic_edges])
+
 
 def _apply_overview_overrides(df: pl.DataFrame, manual_overrides: pl.DataFrame) -> pl.DataFrame:
     if "overview_item_id" not in manual_overrides.columns:
@@ -96,6 +207,7 @@ def classify_regional_genres(
     regional_overview_classification_path: Path,
     indigenous_to_path: Path,
     manual_overrides_path: Path,
+    manual_main_parent_path: Path,
     output_dir: Path,
 ) -> Path:
     logger.info("classifying regional genres in %s", regional_overview_classification_path)
@@ -105,6 +217,8 @@ def classify_regional_genres(
     manual_overrides = pl.read_csv(manual_overrides_path)
     manual_override_ids = set(manual_overrides.select("item_id").unique().to_series())
     df = _apply_overview_overrides(df, manual_overrides)
+    manual_main_parent = pl.read_csv(manual_main_parent_path)
+    df = _apply_manual_main_parent(df, manual_main_parent)
 
     # Seeds: the "music of <place>" items themselves (plus items reclassified into that same
     # non-genre-overview role via manual_overview_reclassifications.csv, e.g. "European folk music"

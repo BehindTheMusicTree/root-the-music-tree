@@ -113,7 +113,7 @@ def test_prune_regional_hierarchy_items_land_in_regional_output(tmp_path: Path) 
 
     regional_path = rh.prune_regional_hierarchy(canonical_parents_path, output_dir)
 
-    assert regional_path == output_dir / "7_regional_hierarchy.parquet"
+    assert regional_path == output_dir / "8_regional_hierarchy.parquet"
 
     regional_df = pl.read_parquet(regional_path)
     assert regional_df.columns == OUTPUT_COLUMNS

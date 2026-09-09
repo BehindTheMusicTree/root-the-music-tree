@@ -141,7 +141,7 @@ def test_prune_canonical_hierarchy_keeps_single_parent_per_item(tmp_path: Path) 
 
     canonical_path = ch.prune_canonical_hierarchy(canonical_parents_path, output_dir)
 
-    assert canonical_path == output_dir / "6_canonical_hierarchy.parquet"
+    assert canonical_path == output_dir / "7_canonical_hierarchy.parquet"
 
     canonical_df = pl.read_parquet(canonical_path)
     assert canonical_df.columns == OUTPUT_COLUMNS
