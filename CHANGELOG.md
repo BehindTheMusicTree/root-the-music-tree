@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `wikidata` Silver: renamed `4_genre_parents`'s `parent_is_genre` column to `parent_is_canonical` — it's only ever consulted by `5_hierarchy`'s canonical pruning (`_prune_canonical`), never by regional pruning, so the old name overstated its scope. See `pipelines/wikidata/DESIGN.md#232-rule-what-counts-as-a-canonical-parent`.
+- `wikidata` Silver: renamed the `4_genre_parents` step itself (module, function, and `4_genre_parents.parquet` output file) to `4_canonical_parents`, for consistency with the `parent_is_canonical` rename above.
+- `wikidata` Silver: renamed the canonical output of the `5_hierarchy` step from `5_hierarchy.parquet` to `5_canonical_hierarchy.parquet` (and internal path variables/refs to match), for symmetry with the already-explicit `5_regional_hierarchy.parquet`.
+- `wikidata` Silver: moved the `manual_theme_genres.csv`/`manual_technique_genres.csv`/`manual_out_of_scope_genres.csv` item drop from `5_canonical_hierarchy` (step 5) to `3_regional_classification` (step 3), so it now runs before the regional cascade rather than after. Hardening only — on current data no dropped item sits upstream of a real genre in the cascade, so this is a no-op today; it guards against a future Wikidata item that would otherwise hand its `is_regional` status down to a real genre beneath it before being pruned. See `pipelines/wikidata/DESIGN.md#224-manual-csv-backstops-for-non-genre-pruning`.
+
 ### Added
 
 - `wikidata` Silver: `2_regional_overview_classification` now reads a new git-tracked, hand-curated `manual_overview_reclassifications.csv` to flag `is_regional_overview = True` (`classification_reason = "manual_overview_reclassification"`) on items that already exist in the genre tree but function as a non-genre regional overview node despite not carrying the `"music of "` label prefix — e.g. "European folk music" (Q98528192), a continent-wide folk-music umbrella. `3_regional_classification`'s seed set now also includes items with this reason, so regional status still cascades correctly to reclassified items' children. See `pipelines/wikidata/DESIGN.md#215-manual-reclassification-of-existing-items-as-overview`.

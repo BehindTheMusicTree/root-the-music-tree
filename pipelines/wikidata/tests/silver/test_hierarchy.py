@@ -1,11 +1,10 @@
 from pathlib import Path
 
 import polars as pl
-import pytest
 
 from wikidata.silver import hierarchy as sh
 
-GENRE_PARENTS_ROWS = [
+CANONICAL_PARENTS_ROWS = [
     # rock music -> popular music: genre -> genre parent, kept in canonical
     {
         "item_id": "Q11399",
@@ -17,7 +16,7 @@ GENRE_PARENTS_ROWS = [
         "parent_url": "https://www.wikidata.org/wiki/Q9778",
         "is_regional_overview": False,
         "classification_reason": None,
-        "parent_is_genre": True,
+        "parent_is_canonical": True,
         "is_regional": False,
         "regional_reason": None,
     },
@@ -32,7 +31,7 @@ GENRE_PARENTS_ROWS = [
         "parent_url": None,
         "is_regional_overview": False,
         "classification_reason": None,
-        "parent_is_genre": None,
+        "parent_is_canonical": None,
         "is_regional": False,
         "regional_reason": None,
     },
@@ -47,7 +46,7 @@ GENRE_PARENTS_ROWS = [
         "parent_url": "https://www.wikidata.org/wiki/Q207628",
         "is_regional_overview": False,
         "classification_reason": None,
-        "parent_is_genre": False,
+        "parent_is_canonical": False,
         "is_regional": False,
         "regional_reason": None,
     },
@@ -63,7 +62,7 @@ GENRE_PARENTS_ROWS = [
         "parent_url": None,
         "is_regional_overview": True,
         "classification_reason": "regional_overview",
-        "parent_is_genre": None,
+        "parent_is_canonical": None,
         "is_regional": True,
         "regional_reason": "seed",
     },
@@ -79,7 +78,7 @@ GENRE_PARENTS_ROWS = [
         "parent_url": "https://www.wikidata.org/wiki/Q11399",
         "is_regional_overview": False,
         "classification_reason": None,
-        "parent_is_genre": True,
+        "parent_is_canonical": True,
         "is_regional": False,
         "regional_reason": None,
     },
@@ -93,7 +92,7 @@ GENRE_PARENTS_ROWS = [
         "parent_url": "https://www.wikidata.org/wiki/Q3868594",
         "is_regional_overview": False,
         "classification_reason": None,
-        "parent_is_genre": False,
+        "parent_is_canonical": False,
         "is_regional": False,
         "regional_reason": None,
     },
@@ -109,7 +108,7 @@ GENRE_PARENTS_ROWS = [
         "parent_url": "https://www.wikidata.org/wiki/Q100",
         "is_regional_overview": False,
         "classification_reason": None,
-        "parent_is_genre": True,
+        "parent_is_canonical": True,
         "is_regional": False,
         "regional_reason": None,
     },
@@ -123,7 +122,7 @@ GENRE_PARENTS_ROWS = [
         "parent_url": "https://www.wikidata.org/wiki/Q9",
         "is_regional_overview": False,
         "classification_reason": None,
-        "parent_is_genre": True,
+        "parent_is_canonical": True,
         "is_regional": False,
         "regional_reason": None,
     },
@@ -138,7 +137,7 @@ GENRE_PARENTS_ROWS = [
         "parent_url": None,
         "is_regional_overview": True,
         "classification_reason": "regional_overview",
-        "parent_is_genre": None,
+        "parent_is_canonical": None,
         "is_regional": True,
         "regional_reason": "seed",
     },
@@ -154,7 +153,7 @@ GENRE_PARENTS_ROWS = [
         "parent_url": "https://www.wikidata.org/wiki/Q1053970",
         "is_regional_overview": False,
         "classification_reason": None,
-        "parent_is_genre": False,
+        "parent_is_canonical": False,
         "is_regional": True,
         "regional_reason": "direct",
     },
@@ -170,56 +169,26 @@ GENRE_PARENTS_ROWS = [
         "parent_url": "https://www.wikidata.org/wiki/Q1198360",
         "is_regional_overview": False,
         "classification_reason": None,
-        "parent_is_genre": True,
+        "parent_is_canonical": True,
         "is_regional": True,
         "regional_reason": "inherited",
     },
 ]
 
 
-def _write_genre_parents(tmp_path: Path, rows: list[dict] | None = None) -> Path:
-    genre_parents_path = tmp_path / "4_genre_parents.parquet"
-    pl.DataFrame(GENRE_PARENTS_ROWS if rows is None else rows).write_parquet(genre_parents_path)
-    return genre_parents_path
-
-
-def _write_manual_theme_genres(tmp_path: Path, rows: list[dict]) -> Path:
-    manual_theme_genres_path = tmp_path / "manual_theme_genres.csv"
-    schema = {"item_id": pl.Utf8, "item_label": pl.Utf8, "reason": pl.Utf8}
-    pl.DataFrame(rows, schema=schema).write_csv(manual_theme_genres_path)
-    return manual_theme_genres_path
-
-
-def _write_manual_technique_genres(tmp_path: Path, rows: list[dict]) -> Path:
-    manual_technique_genres_path = tmp_path / "manual_technique_genres.csv"
-    schema = {"item_id": pl.Utf8, "item_label": pl.Utf8, "reason": pl.Utf8}
-    pl.DataFrame(rows, schema=schema).write_csv(manual_technique_genres_path)
-    return manual_technique_genres_path
-
-
-def _write_manual_out_of_scope_genres(tmp_path: Path, rows: list[dict]) -> Path:
-    manual_out_of_scope_genres_path = tmp_path / "manual_out_of_scope_genres.csv"
-    schema = {"item_id": pl.Utf8, "item_label": pl.Utf8, "reason": pl.Utf8}
-    pl.DataFrame(rows, schema=schema).write_csv(manual_out_of_scope_genres_path)
-    return manual_out_of_scope_genres_path
+def _write_canonical_parents(tmp_path: Path, rows: list[dict] | None = None) -> Path:
+    canonical_parents_path = tmp_path / "4_canonical_parents.parquet"
+    pl.DataFrame(CANONICAL_PARENTS_ROWS if rows is None else rows).write_parquet(canonical_parents_path)
+    return canonical_parents_path
 
 
 def test_prune_genre_hierarchy_keeps_single_parent_per_item(tmp_path: Path) -> None:
-    genre_parents_path = _write_genre_parents(tmp_path)
-    manual_theme_genres_path = _write_manual_theme_genres(tmp_path, [])
-    manual_technique_genres_path = _write_manual_technique_genres(tmp_path, [])
-    manual_out_of_scope_genres_path = _write_manual_out_of_scope_genres(tmp_path, [])
+    canonical_parents_path = _write_canonical_parents(tmp_path)
     output_dir = tmp_path / "silver"
 
-    canonical_path, regional_path = sh.prune_genre_hierarchy(
-        genre_parents_path,
-        manual_theme_genres_path,
-        manual_technique_genres_path,
-        manual_out_of_scope_genres_path,
-        output_dir,
-    )
+    canonical_path, regional_path = sh.prune_genre_hierarchy(canonical_parents_path, output_dir)
 
-    assert canonical_path == output_dir / "5_hierarchy.parquet"
+    assert canonical_path == output_dir / "5_canonical_hierarchy.parquet"
     assert regional_path == output_dir / "5_regional_hierarchy.parquet"
 
     canonical_df = pl.read_parquet(canonical_path)
@@ -246,19 +215,10 @@ def test_prune_genre_hierarchy_keeps_single_parent_per_item(tmp_path: Path) -> N
 
 
 def test_prune_genre_hierarchy_regional_items_land_in_regional_output(tmp_path: Path) -> None:
-    genre_parents_path = _write_genre_parents(tmp_path)
-    manual_theme_genres_path = _write_manual_theme_genres(tmp_path, [])
-    manual_technique_genres_path = _write_manual_technique_genres(tmp_path, [])
-    manual_out_of_scope_genres_path = _write_manual_out_of_scope_genres(tmp_path, [])
+    canonical_parents_path = _write_canonical_parents(tmp_path)
     output_dir = tmp_path / "silver"
 
-    _, regional_path = sh.prune_genre_hierarchy(
-        genre_parents_path,
-        manual_theme_genres_path,
-        manual_technique_genres_path,
-        manual_out_of_scope_genres_path,
-        output_dir,
-    )
+    _, regional_path = sh.prune_genre_hierarchy(canonical_parents_path, output_dir)
 
     regional_df = pl.read_parquet(regional_path)
     assert regional_df.columns == sh.OUTPUT_COLUMNS
@@ -283,272 +243,9 @@ def test_prune_genre_hierarchy_regional_items_land_in_regional_output(tmp_path: 
 
 
 def test_prune_genre_hierarchy_creates_output_dir(tmp_path: Path) -> None:
-    genre_parents_path = _write_genre_parents(tmp_path)
-    manual_theme_genres_path = _write_manual_theme_genres(tmp_path, [])
-    manual_technique_genres_path = _write_manual_technique_genres(tmp_path, [])
-    manual_out_of_scope_genres_path = _write_manual_out_of_scope_genres(tmp_path, [])
+    canonical_parents_path = _write_canonical_parents(tmp_path)
     output_dir = tmp_path / "does" / "not" / "exist"
 
-    sh.prune_genre_hierarchy(
-        genre_parents_path,
-        manual_theme_genres_path,
-        manual_technique_genres_path,
-        manual_out_of_scope_genres_path,
-        output_dir,
-    )
+    sh.prune_genre_hierarchy(canonical_parents_path, output_dir)
 
     assert output_dir.is_dir()
-
-
-def test_prune_genre_hierarchy_drops_theme_items_from_both_trees(tmp_path: Path) -> None:
-    genre_parents_path = _write_genre_parents(tmp_path)
-    # Q11399 (rock music) is the one canonical theme item, Q1198360 (morna) is the one regional
-    # theme item — flag both.
-    manual_theme_genres_path = _write_manual_theme_genres(
-        tmp_path,
-        [
-            {"item_id": "Q11399", "item_label": "rock music", "reason": "test"},
-            {"item_id": "Q1198360", "item_label": "morna", "reason": "test"},
-        ],
-    )
-    manual_technique_genres_path = _write_manual_technique_genres(tmp_path, [])
-    manual_out_of_scope_genres_path = _write_manual_out_of_scope_genres(tmp_path, [])
-    output_dir = tmp_path / "silver"
-
-    canonical_path, regional_path = sh.prune_genre_hierarchy(
-        genre_parents_path,
-        manual_theme_genres_path,
-        manual_technique_genres_path,
-        manual_out_of_scope_genres_path,
-        output_dir,
-    )
-
-    canonical_df = pl.read_parquet(canonical_path)
-    canonical_parent_by_item = {row["item_id"]: row["parent_id"] for row in canonical_df.to_dicts()}
-    # the theme item itself is gone entirely
-    assert "Q11399" not in canonical_parent_by_item
-    # its child's edge into the theme parent is severed; the child's only other edge is already
-    # non-genre, so it's promoted to an orphan root instead of vanishing
-    assert canonical_parent_by_item["Q999999"] is None
-
-    regional_df = pl.read_parquet(regional_path)
-    regional_parent_by_item = {row["item_id"]: row["parent_id"] for row in regional_df.to_dicts()}
-    # the theme item itself is gone entirely
-    assert "Q1198360" not in regional_parent_by_item
-    # its child (fado) loses that parent edge and is promoted to an orphan root instead of vanishing
-    assert regional_parent_by_item["Q182142"] is None
-
-
-def test_prune_genre_hierarchy_raises_on_unknown_theme_item_id(tmp_path: Path) -> None:
-    genre_parents_path = _write_genre_parents(tmp_path)
-    manual_theme_genres_path = _write_manual_theme_genres(
-        tmp_path, [{"item_id": "Q0000000", "item_label": "not in the tree", "reason": "test"}]
-    )
-    manual_technique_genres_path = _write_manual_technique_genres(tmp_path, [])
-    manual_out_of_scope_genres_path = _write_manual_out_of_scope_genres(tmp_path, [])
-    output_dir = tmp_path / "silver"
-
-    with pytest.raises(ValueError, match="Q0000000"):
-        sh.prune_genre_hierarchy(
-            genre_parents_path,
-            manual_theme_genres_path,
-            manual_technique_genres_path,
-            manual_out_of_scope_genres_path,
-            output_dir,
-        )
-
-
-def test_prune_genre_hierarchy_raises_on_blank_theme_item_id(tmp_path: Path) -> None:
-    genre_parents_path = _write_genre_parents(tmp_path)
-    manual_theme_genres_path = _write_manual_theme_genres(
-        tmp_path, [{"item_id": "", "item_label": "blank id", "reason": "test"}]
-    )
-    manual_technique_genres_path = _write_manual_technique_genres(tmp_path, [])
-    manual_out_of_scope_genres_path = _write_manual_out_of_scope_genres(tmp_path, [])
-    output_dir = tmp_path / "silver"
-
-    with pytest.raises(ValueError, match="null/blank"):
-        sh.prune_genre_hierarchy(
-            genre_parents_path,
-            manual_theme_genres_path,
-            manual_technique_genres_path,
-            manual_out_of_scope_genres_path,
-            output_dir,
-        )
-
-
-def test_prune_genre_hierarchy_raises_on_duplicate_theme_item_id(tmp_path: Path) -> None:
-    genre_parents_path = _write_genre_parents(tmp_path)
-    manual_theme_genres_path = _write_manual_theme_genres(
-        tmp_path,
-        [
-            {"item_id": "Q9778", "item_label": "popular music", "reason": "test"},
-            {"item_id": "Q9778", "item_label": "popular music", "reason": "test duplicate"},
-        ],
-    )
-    manual_technique_genres_path = _write_manual_technique_genres(tmp_path, [])
-    manual_out_of_scope_genres_path = _write_manual_out_of_scope_genres(tmp_path, [])
-    output_dir = tmp_path / "silver"
-
-    with pytest.raises(ValueError, match="duplicate"):
-        sh.prune_genre_hierarchy(
-            genre_parents_path,
-            manual_theme_genres_path,
-            manual_technique_genres_path,
-            manual_out_of_scope_genres_path,
-            output_dir,
-        )
-
-
-def test_prune_genre_hierarchy_drops_technique_items_from_both_trees(tmp_path: Path) -> None:
-    genre_parents_path = _write_genre_parents(tmp_path)
-    manual_theme_genres_path = _write_manual_theme_genres(tmp_path, [])
-    # Reuse existing canonical (Q11399, rock music) and regional (Q1198360, morna) fixture items as
-    # stand-ins for technique items being flagged, mirroring the theme-drop test above.
-    manual_technique_genres_path = _write_manual_technique_genres(
-        tmp_path,
-        [
-            {"item_id": "Q11399", "item_label": "rock music", "reason": "test"},
-            {"item_id": "Q1198360", "item_label": "morna", "reason": "test"},
-        ],
-    )
-    manual_out_of_scope_genres_path = _write_manual_out_of_scope_genres(tmp_path, [])
-    output_dir = tmp_path / "silver"
-
-    canonical_path, regional_path = sh.prune_genre_hierarchy(
-        genre_parents_path,
-        manual_theme_genres_path,
-        manual_technique_genres_path,
-        manual_out_of_scope_genres_path,
-        output_dir,
-    )
-
-    canonical_df = pl.read_parquet(canonical_path)
-    canonical_parent_by_item = {row["item_id"]: row["parent_id"] for row in canonical_df.to_dicts()}
-    assert "Q11399" not in canonical_parent_by_item
-    # Q999999's only other edge is already non-genre, so it's promoted to an orphan root
-    assert canonical_parent_by_item["Q999999"] is None
-
-    regional_df = pl.read_parquet(regional_path)
-    regional_parent_by_item = {row["item_id"]: row["parent_id"] for row in regional_df.to_dicts()}
-    assert "Q1198360" not in regional_parent_by_item
-    assert regional_parent_by_item["Q182142"] is None
-
-
-def test_prune_genre_hierarchy_raises_on_unknown_technique_item_id(tmp_path: Path) -> None:
-    genre_parents_path = _write_genre_parents(tmp_path)
-    manual_theme_genres_path = _write_manual_theme_genres(tmp_path, [])
-    manual_technique_genres_path = _write_manual_technique_genres(
-        tmp_path, [{"item_id": "Q0000000", "item_label": "not in the tree", "reason": "test"}]
-    )
-    manual_out_of_scope_genres_path = _write_manual_out_of_scope_genres(tmp_path, [])
-    output_dir = tmp_path / "silver"
-
-    with pytest.raises(ValueError, match="Q0000000"):
-        sh.prune_genre_hierarchy(
-            genre_parents_path,
-            manual_theme_genres_path,
-            manual_technique_genres_path,
-            manual_out_of_scope_genres_path,
-            output_dir,
-        )
-
-
-def test_prune_genre_hierarchy_raises_on_duplicate_technique_item_id(tmp_path: Path) -> None:
-    genre_parents_path = _write_genre_parents(tmp_path)
-    manual_theme_genres_path = _write_manual_theme_genres(tmp_path, [])
-    manual_technique_genres_path = _write_manual_technique_genres(
-        tmp_path,
-        [
-            {"item_id": "Q9778", "item_label": "popular music", "reason": "test"},
-            {"item_id": "Q9778", "item_label": "popular music", "reason": "test duplicate"},
-        ],
-    )
-    manual_out_of_scope_genres_path = _write_manual_out_of_scope_genres(tmp_path, [])
-    output_dir = tmp_path / "silver"
-
-    with pytest.raises(ValueError, match="duplicate"):
-        sh.prune_genre_hierarchy(
-            genre_parents_path,
-            manual_theme_genres_path,
-            manual_technique_genres_path,
-            manual_out_of_scope_genres_path,
-            output_dir,
-        )
-
-
-def test_prune_genre_hierarchy_drops_out_of_scope_items_from_both_trees(tmp_path: Path) -> None:
-    genre_parents_path = _write_genre_parents(tmp_path)
-    manual_theme_genres_path = _write_manual_theme_genres(tmp_path, [])
-    manual_technique_genres_path = _write_manual_technique_genres(tmp_path, [])
-    # Reuse existing canonical (Q11399, rock music) and regional (Q1198360, morna) fixture items as
-    # stand-ins for out-of-scope items being flagged, mirroring the theme/technique-drop tests above.
-    manual_out_of_scope_genres_path = _write_manual_out_of_scope_genres(
-        tmp_path,
-        [
-            {"item_id": "Q11399", "item_label": "rock music", "reason": "test"},
-            {"item_id": "Q1198360", "item_label": "morna", "reason": "test"},
-        ],
-    )
-    output_dir = tmp_path / "silver"
-
-    canonical_path, regional_path = sh.prune_genre_hierarchy(
-        genre_parents_path,
-        manual_theme_genres_path,
-        manual_technique_genres_path,
-        manual_out_of_scope_genres_path,
-        output_dir,
-    )
-
-    canonical_df = pl.read_parquet(canonical_path)
-    canonical_parent_by_item = {row["item_id"]: row["parent_id"] for row in canonical_df.to_dicts()}
-    assert "Q11399" not in canonical_parent_by_item
-    # Q999999's only other edge is already non-genre, so it's promoted to an orphan root
-    assert canonical_parent_by_item["Q999999"] is None
-
-    regional_df = pl.read_parquet(regional_path)
-    regional_parent_by_item = {row["item_id"]: row["parent_id"] for row in regional_df.to_dicts()}
-    assert "Q1198360" not in regional_parent_by_item
-    assert regional_parent_by_item["Q182142"] is None
-
-
-def test_prune_genre_hierarchy_raises_on_unknown_out_of_scope_item_id(tmp_path: Path) -> None:
-    genre_parents_path = _write_genre_parents(tmp_path)
-    manual_theme_genres_path = _write_manual_theme_genres(tmp_path, [])
-    manual_technique_genres_path = _write_manual_technique_genres(tmp_path, [])
-    manual_out_of_scope_genres_path = _write_manual_out_of_scope_genres(
-        tmp_path, [{"item_id": "Q0000000", "item_label": "not in the tree", "reason": "test"}]
-    )
-    output_dir = tmp_path / "silver"
-
-    with pytest.raises(ValueError, match="Q0000000"):
-        sh.prune_genre_hierarchy(
-            genre_parents_path,
-            manual_theme_genres_path,
-            manual_technique_genres_path,
-            manual_out_of_scope_genres_path,
-            output_dir,
-        )
-
-
-def test_prune_genre_hierarchy_raises_on_duplicate_out_of_scope_item_id(tmp_path: Path) -> None:
-    genre_parents_path = _write_genre_parents(tmp_path)
-    manual_theme_genres_path = _write_manual_theme_genres(tmp_path, [])
-    manual_technique_genres_path = _write_manual_technique_genres(tmp_path, [])
-    manual_out_of_scope_genres_path = _write_manual_out_of_scope_genres(
-        tmp_path,
-        [
-            {"item_id": "Q9778", "item_label": "popular music", "reason": "test"},
-            {"item_id": "Q9778", "item_label": "popular music", "reason": "test duplicate"},
-        ],
-    )
-    output_dir = tmp_path / "silver"
-
-    with pytest.raises(ValueError, match="duplicate"):
-        sh.prune_genre_hierarchy(
-            genre_parents_path,
-            manual_theme_genres_path,
-            manual_technique_genres_path,
-            manual_out_of_scope_genres_path,
-            output_dir,
-        )

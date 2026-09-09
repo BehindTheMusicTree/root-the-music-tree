@@ -50,7 +50,7 @@ HIERARCHY_ROWS = [
 
 
 def _write_hierarchy(tmp_path: Path) -> Path:
-    hierarchy_path = tmp_path / "5_hierarchy.parquet"
+    hierarchy_path = tmp_path / "5_canonical_hierarchy.parquet"
     pl.DataFrame(HIERARCHY_ROWS).write_parquet(hierarchy_path)
     return hierarchy_path
 
