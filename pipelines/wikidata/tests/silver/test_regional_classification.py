@@ -178,16 +178,28 @@ def _write_manual_overrides(tmp_path: Path) -> Path:
     return manual_overrides_path
 
 
+def _write_manual_main_parent(tmp_path: Path) -> Path:
+    manual_main_parent_path = tmp_path / "manual_main_parent.csv"
+    pl.DataFrame(
+        schema={"item_id": pl.Utf8, "item_label": pl.Utf8, "reason": pl.Utf8, "parent_item_id": pl.Utf8}
+    ).write_csv(manual_main_parent_path)
+    return manual_main_parent_path
+
+
 def _classify_regional_genres(
     regional_overview_classification_path: Path,
     indigenous_to_path: Path,
     manual_overrides_path: Path,
     output_dir: Path,
+    manual_main_parent_path: Path | None = None,
+    *,
+    tmp_path: Path | None = None,
 ) -> Path:
     return sr.classify_regional_genres(
         regional_overview_classification_path,
         indigenous_to_path,
         manual_overrides_path,
+        manual_main_parent_path or _write_manual_main_parent(tmp_path or output_dir.parent),
         output_dir,
     )
 
@@ -455,7 +467,211 @@ def test_classify_regional_genres_creates_output_dir(tmp_path: Path) -> None:
     output_dir = tmp_path / "does" / "not" / "exist"
 
     _classify_regional_genres(
-        regional_overview_classification_path, indigenous_to_path, manual_overrides_path, output_dir
+        regional_overview_classification_path, indigenous_to_path, manual_overrides_path, output_dir, tmp_path=tmp_path
     )
 
     assert output_dir.is_dir()
+
+
+def test_classify_regional_genres_inherits_is_regional_through_manual_parent(tmp_path: Path) -> None:
+    # jazz has no regional ancestor in the base fixture; point it at the regional seed via a manual
+    # parent override and confirm is_regional/regional_reason are derived by the cascade, not by any
+    # special-casing of the manual edge itself.
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
+    indigenous_to_path = _write_indigenous_to(tmp_path)
+    manual_overrides_path = tmp_path / "manual_regional_overrides.csv"
+    pl.DataFrame(
+        {"item_id": [], "item_label": [], "reason": [], "overview_item_id": []},
+        schema={"item_id": pl.Utf8, "item_label": pl.Utf8, "reason": pl.Utf8, "overview_item_id": pl.Utf8},
+    ).write_csv(manual_overrides_path)
+    manual_main_parent_path = tmp_path / "manual_main_parent.csv"
+    pl.DataFrame(
+        {
+            "item_id": ["Q1198131"],  # morna, a root item with no parent in the base fixture
+            "item_label": ["morna"],
+            "reason": ["test override"],
+            "parent_item_id": ["Q106556293"],  # Portuguese folk music, regional but not an overview item
+        }
+    ).write_csv(manual_main_parent_path)
+    output_dir = tmp_path / "silver"
+
+    result = _classify_regional_genres(
+        regional_overview_classification_path,
+        indigenous_to_path,
+        manual_overrides_path,
+        output_dir,
+        manual_main_parent_path,
+    )
+
+    df = pl.read_parquet(result)
+    morna_row = df.filter(pl.col("item_id") == "Q1198131").row(0, named=True)
+    assert morna_row["parent_id"] == "Q106556293"
+    assert morna_row["relation_type"] == "manual_main_parent"
+    assert morna_row["is_regional"]
+    assert morna_row["regional_reason"] == "inherited"
+
+
+def test_classify_regional_genres_manual_parent_stays_canonical_under_canonical_parent(tmp_path: Path) -> None:
+    # Pointing a root at a canonical (non-regional) parent should leave the item canonical — the
+    # cascade decides based on the parent's actual status, no special-casing needed either way.
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
+    indigenous_to_path = _write_indigenous_to(tmp_path)
+    manual_overrides_path = tmp_path / "manual_regional_overrides.csv"
+    pl.DataFrame(
+        {"item_id": [], "item_label": [], "reason": [], "overview_item_id": []},
+        schema={"item_id": pl.Utf8, "item_label": pl.Utf8, "reason": pl.Utf8, "overview_item_id": pl.Utf8},
+    ).write_csv(manual_overrides_path)
+    manual_main_parent_path = tmp_path / "manual_main_parent.csv"
+    pl.DataFrame(
+        {
+            "item_id": ["Q1198131"],  # morna, a root item with no parent in the base fixture
+            "item_label": ["morna"],
+            "reason": ["test override"],
+            "parent_item_id": ["Q9778"],  # popular music, canonical
+        }
+    ).write_csv(manual_main_parent_path)
+    output_dir = tmp_path / "silver"
+
+    result = _classify_regional_genres(
+        regional_overview_classification_path,
+        indigenous_to_path,
+        manual_overrides_path,
+        output_dir,
+        manual_main_parent_path,
+    )
+
+    df = pl.read_parquet(result)
+    morna_row = df.filter(pl.col("item_id") == "Q1198131").row(0, named=True)
+    assert morna_row["parent_id"] == "Q9778"
+    assert not morna_row["is_regional"]
+    assert morna_row["regional_reason"] is None
+
+
+def test_classify_regional_genres_raises_on_missing_parent_item_id_column(tmp_path: Path) -> None:
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
+    indigenous_to_path = _write_indigenous_to(tmp_path)
+    manual_overrides_path = _write_manual_overrides(tmp_path)
+    manual_main_parent_path = tmp_path / "manual_main_parent.csv"
+    pl.DataFrame({"item_id": ["Q1198131"], "item_label": ["morna"], "reason": ["test"]}).write_csv(
+        manual_main_parent_path
+    )
+    output_dir = tmp_path / "silver"
+
+    with pytest.raises(ValueError, match="parent_item_id"):
+        _classify_regional_genres(
+            regional_overview_classification_path,
+            indigenous_to_path,
+            manual_overrides_path,
+            output_dir,
+            manual_main_parent_path,
+        )
+
+
+def test_classify_regional_genres_raises_on_unknown_parent_item_id(tmp_path: Path) -> None:
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
+    indigenous_to_path = _write_indigenous_to(tmp_path)
+    manual_overrides_path = _write_manual_overrides(tmp_path)
+    manual_main_parent_path = tmp_path / "manual_main_parent.csv"
+    pl.DataFrame(
+        {
+            "item_id": ["Q1198131"],
+            "item_label": ["morna"],
+            "reason": ["test"],
+            "parent_item_id": ["Q0000000"],
+        }
+    ).write_csv(manual_main_parent_path)
+    output_dir = tmp_path / "silver"
+
+    with pytest.raises(ValueError, match="Q0000000"):
+        _classify_regional_genres(
+            regional_overview_classification_path,
+            indigenous_to_path,
+            manual_overrides_path,
+            output_dir,
+            manual_main_parent_path,
+        )
+
+
+def test_classify_regional_genres_raises_on_parent_item_id_is_regional_overview(tmp_path: Path) -> None:
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
+    indigenous_to_path = _write_indigenous_to(tmp_path)
+    manual_overrides_path = _write_manual_overrides(tmp_path)
+    manual_main_parent_path = tmp_path / "manual_main_parent.csv"
+    pl.DataFrame(
+        {
+            "item_id": ["Q1198131"],
+            "item_label": ["morna"],
+            "reason": ["test"],
+            "parent_item_id": ["Q2579987"],  # music of Portugal, is_regional_overview=True
+        }
+    ).write_csv(manual_main_parent_path)
+    output_dir = tmp_path / "silver"
+
+    with pytest.raises(ValueError, match="Q2579987"):
+        _classify_regional_genres(
+            regional_overview_classification_path,
+            indigenous_to_path,
+            manual_overrides_path,
+            output_dir,
+            manual_main_parent_path,
+        )
+
+
+def test_classify_regional_genres_allows_override_for_item_with_existing_parent(tmp_path: Path) -> None:
+    # fado already has a parent edge to Portuguese folk music in the base fixture — the root-only
+    # restriction has been removed, so overriding it now succeeds: the override becomes the item's
+    # main parent, and the old Bronze edge survives as a separate row for main_parent_selection.py
+    # to resolve downstream.
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
+    indigenous_to_path = _write_indigenous_to(tmp_path)
+    manual_overrides_path = _write_manual_overrides(tmp_path)
+    manual_main_parent_path = tmp_path / "manual_main_parent.csv"
+    pl.DataFrame(
+        {
+            "item_id": ["Q185676"],  # fado, already has a parent edge to Portuguese folk music
+            "item_label": ["fado"],
+            "reason": ["test"],
+            "parent_item_id": ["Q8341"],  # jazz
+        }
+    ).write_csv(manual_main_parent_path)
+    output_dir = tmp_path / "silver"
+
+    result = _classify_regional_genres(
+        regional_overview_classification_path,
+        indigenous_to_path,
+        manual_overrides_path,
+        output_dir,
+        manual_main_parent_path,
+    )
+
+    df = pl.read_parquet(result)
+    fado_rows = df.filter(pl.col("item_id") == "Q185676")
+    parent_ids = set(fado_rows.select("parent_id").to_series().to_list())
+    assert parent_ids == {"Q106556293", "Q8341"}
+    override_row = fado_rows.filter(pl.col("parent_id") == "Q8341").row(0, named=True)
+    assert override_row["relation_type"] == "manual_main_parent"
+
+
+def test_classify_regional_genres_raises_on_duplicate_parent_override_item_id(tmp_path: Path) -> None:
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
+    indigenous_to_path = _write_indigenous_to(tmp_path)
+    manual_overrides_path = _write_manual_overrides(tmp_path)
+    manual_main_parent_path = tmp_path / "manual_main_parent.csv"
+    pl.DataFrame(
+        {
+            "item_id": ["Q1198131", "Q1198131"],
+            "item_label": ["morna", "morna"],
+            "reason": ["test", "test duplicate"],
+            "parent_item_id": ["Q8341", "Q8341"],
+        }
+    ).write_csv(manual_main_parent_path)
+    output_dir = tmp_path / "silver"
+
+    with pytest.raises(ValueError, match="duplicate"):
+        _classify_regional_genres(
+            regional_overview_classification_path,
+            indigenous_to_path,
+            manual_overrides_path,
+            output_dir,
+            manual_main_parent_path,
+        )
