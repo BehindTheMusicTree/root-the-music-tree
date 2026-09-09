@@ -16,8 +16,7 @@ def prune_canonical_hierarchy(canonical_parents_path: Path, output_dir: Path) ->
         pl.col("item_id").alias("parent_id"), pl.col("is_regional").alias("parent_is_regional")
     ).unique()
 
-    # Canonical: real genres that are not regional, even though `is_regional_overview` is True for
-    # the "music of <place>" seed items themselves — those are excluded here via `is_regional`.
+    # Canonical: genres that are not regional
     canonical_items = df.filter(~pl.col("is_regional")).join(parent_is_regional, on="parent_id", how="left")
 
     # An item whose parent edges all lead to a non-genre item (e.g. "electronic music" -> "music")
