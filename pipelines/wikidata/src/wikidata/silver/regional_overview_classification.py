@@ -18,7 +18,7 @@ WIKIDATA_ITEM_URL_PREFIX = "https://www.wikidata.org/wiki/"
 # NOT dropped: they stay in the dataset and later become regional-tree nodes
 # via `is_regional` in step 3. There are ~300 such items among ~6,300 items.
 #
-# These items are also the seeds for "3_regional_classification", which propagates
+# These items are also the seeds for "4_regional_classification", which propagates
 # `is_regional` through parent relationships: genres whose parent is one of these
 # items are classified as regional genres (e.g. morna, fado). The seed items
 # themselves are also classified as regional genre nodes.
@@ -34,7 +34,7 @@ REGIONAL_OVERVIEW_PREFIX = "music of "
 # the dataset happens to declare it as a P279/P361 parent) can be added here by a data expert who
 # looked up its real Wikidata QID (or, as a last resort when no matching Wikidata item exists,
 # a synthetic `LOCAL:`-prefixed id), so it becomes a legal `manual_regional_overrides.csv`
-# `overview_item_id` target. See DESIGN.md#21-2_regional_overview_classification.
+# `overview_item_id` target. See DESIGN.md#22-3_regional_overview_classification.
 MANUAL_OVERVIEW_ADDITIONS_PATH = Path(__file__).parent / "manual_regional_overview_additions.csv"
 
 # Committed alongside the code for the same reason as MANUAL_OVERVIEW_ADDITIONS_PATH, but for the
@@ -45,7 +45,7 @@ MANUAL_OVERVIEW_ADDITIONS_PATH = Path(__file__).parent / "manual_regional_overvi
 # `manual_regional_overview_additions.csv`, `item_label` here does NOT need the "music of " prefix
 # (that's the whole point — these are exactly the items the prefix rule can't catch), but `item_id`
 # MUST already be present in the genre tree, with a matching `item_label`, and not already flagged
-# `is_regional_overview` by the prefix rule. See DESIGN.md#21-2_regional_overview_classification.
+# `is_regional_overview` by the prefix rule. See DESIGN.md#22-3_regional_overview_classification.
 MANUAL_OVERVIEW_RECLASSIFICATIONS_PATH = Path(__file__).parent / "manual_overview_reclassifications.csv"
 MANUAL_OVERVIEW_RECLASSIFICATION_REASON = "manual_overview_reclassification"
 
@@ -196,10 +196,10 @@ def _promote_orphan_overview_parents(df: pl.DataFrame) -> pl.DataFrame:
 
 
 def classify_regional_from_overviews(
-    item_links_path: Path, manual_additions_path: Path, reclassifications_path: Path, output_dir: Path
+    non_genre_pruning_path: Path, manual_additions_path: Path, reclassifications_path: Path, output_dir: Path
 ) -> Path:
-    logger.info("classifying regional from overviews %s", item_links_path)
-    df = pl.read_parquet(item_links_path)
+    logger.info("classifying regional from overviews %s", non_genre_pruning_path)
+    df = pl.read_parquet(non_genre_pruning_path)
     df = _promote_orphan_overview_parents(df)
     manual_additions_schema = {"item_id": pl.Utf8, "item_label": pl.Utf8, "reason": pl.Utf8}
     df = _add_manual_overview_items(df, pl.read_csv(manual_additions_path, schema_overrides=manual_additions_schema))
@@ -221,7 +221,7 @@ def classify_regional_from_overviews(
     )
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / "2_regional_overview_classification.parquet"
+    output_path = output_dir / "3_regional_overview_classification.parquet"
     df.write_parquet(output_path)
     logger.info(
         "wrote %d rows to %s (%d tagged regional overview)",

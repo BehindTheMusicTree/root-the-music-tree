@@ -177,7 +177,7 @@ CANONICAL_PARENTS_ROWS = [
 
 
 def _write_canonical_parents(tmp_path: Path, rows: list[dict] | None = None) -> Path:
-    canonical_parents_path = tmp_path / "4_canonical_parents.parquet"
+    canonical_parents_path = tmp_path / "5_canonical_parents.parquet"
     pl.DataFrame(CANONICAL_PARENTS_ROWS if rows is None else rows).write_parquet(canonical_parents_path)
     return canonical_parents_path
 
@@ -188,8 +188,8 @@ def test_prune_genre_hierarchy_keeps_single_parent_per_item(tmp_path: Path) -> N
 
     canonical_path, regional_path = sh.prune_genre_hierarchy(canonical_parents_path, output_dir)
 
-    assert canonical_path == output_dir / "5_canonical_hierarchy.parquet"
-    assert regional_path == output_dir / "5_regional_hierarchy.parquet"
+    assert canonical_path == output_dir / "6_canonical_hierarchy.parquet"
+    assert regional_path == output_dir / "6_regional_hierarchy.parquet"
 
     canonical_df = pl.read_parquet(canonical_path)
     assert canonical_df.columns == sh.OUTPUT_COLUMNS
