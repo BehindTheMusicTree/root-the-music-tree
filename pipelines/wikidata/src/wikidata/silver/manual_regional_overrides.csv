@@ -637,3 +637,10 @@ Q7179597,Peyote song,"confirmed via WebSearch: ceremonial music of the Native Am
 Q7251113,Prostopinije,"Ruthenian/Byzantine Rite plainchant tradition, a religious rather than national/ethnic classification",LOCAL:eastern-orthodox-chant
 Q16682190,Slavic rite song,"Slavic Byzantine Rite liturgical chant tradition, a religious rather than national/ethnic classification",LOCAL:eastern-orthodox-chant
 Q18242331,candomblé song,song of the Afro-Brazilian Candomblé religious tradition,Q899215
+Q2127044,gezang,root item with no P279/P361 parent; a Dutch sacred/secular song genre missed by the automated seed/indigenous_to/country_of_origin classification,Q377185
+Q1092924,villotta,root item with no P279/P361 parent; a Friulian/Northern Italian folk-song genre missed by the automated seed/indigenous_to/country_of_origin classification,Q3679098
+Q7042505,Njuup,root item with no P279/P361 parent; a Senegalese (Serer) traditional genre missed by the automated seed/indigenous_to/country_of_origin classification,Q3328770
+Q4198071,Hiérodrame,root item with no P279/P361 parent; an 18th-century French sacred musical-drama genre missed by the automated seed/indigenous_to/country_of_origin classification,Q672134
+Q663979,glee,root item with no P279/P361 parent; an English part-song genre missed by the automated seed/indigenous_to/country_of_origin classification,Q110558058
+Q1620760,historia,root item with no P279/P361 parent; a German/Lutheran liturgical narrative genre missed by the automated seed/indigenous_to/country_of_origin classification,Q2743758
+Q79891737,Carpathian plainchant,root item with no P279/P361 parent; Carpatho-Rusyn liturgical chant tradition spanning Ukraine/Slovakia/Poland with no single modern national home; user requested the Eastern Orthodox umbrella,LOCAL:eastern-orthodox-chant
