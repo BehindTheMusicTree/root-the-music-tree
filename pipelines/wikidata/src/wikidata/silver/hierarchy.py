@@ -80,9 +80,7 @@ def prune_genre_hierarchy(canonical_parents_path: Path, output_dir: Path) -> tup
     # Canonical: real genres that are not regional. Regional: everything flagged `is_regional`,
     # which now includes the "music of <place>" seed items themselves — they're regional genre
     # nodes here, not dropped, even though `is_regional_overview` is True for them.
-    canonical_items = df.filter(~pl.col("is_regional_overview") & ~pl.col("is_regional")).join(
-        parent_is_regional, on="parent_id", how="left"
-    )
+    canonical_items = df.filter(~pl.col("is_regional")).join(parent_is_regional, on="parent_id", how="left")
     regional_items = df.filter(pl.col("is_regional")).join(parent_is_regional, on="parent_id", how="left")
 
     canonical = _prune_canonical(canonical_items)
