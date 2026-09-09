@@ -26,7 +26,8 @@ pipeline overview.
     - [3.5 4_regional_classification](#35-4_regional_classification)
     - [3.6 5_canonical_parents](#36-5_canonical_parents)
     - [3.7 6_canonical_hierarchy](#37-6_canonical_hierarchy)
-    - [3.8 7_canonical_roots](#38-7_canonical_roots)
+    - [3.8 7_regional_hierarchy](#38-7_regional_hierarchy)
+    - [3.9 8_canonical_roots](#39-8_canonical_roots)
 
 ## 1. Wikidata properties used
 
@@ -147,15 +148,16 @@ own (as of this writing: 2,496 rows).
 
 ## 3. Silver
 
-All six steps below are produced by `wikidata.silver`. `1_item_links` preserves the Bronze
+All eight steps below are produced by `wikidata.silver`. `1_item_links` preserves the Bronze
 edge-list grain 1:1 (`item_id` still not unique) — it doesn't drop rows; downstream consumers
 filter on the added columns themselves. `2_non_genre_pruning` is the step that drops rows, via
 manual CSV backstops (theme/technique/out-of-scope items — see
 [DESIGN.md#21-2_non_genre_pruning](DESIGN.md#21-2_non_genre_pruning)), run as early as possible so
 every step downstream works with a smaller, cleaner tree. `3_regional_overview_classification`
 preserves whatever grain it receives unchanged aside from its own added columns, and so do
-`4_regional_classification` and `5_canonical_parents`. `6_canonical_hierarchy` is the step that
-prunes to the final hierarchy shape: it's the first where `item_id` is unique — see below.
+`4_regional_classification` and `5_canonical_parents`. `6_canonical_hierarchy` and
+`7_regional_hierarchy` are the steps that prune to the final hierarchy shape: they're the first
+where `item_id` is unique — see below.
 
 ### 3.1 Overview
 
@@ -166,8 +168,9 @@ prunes to the final hierarchy shape: it's the first where `item_id` is unique �
 | [`3_regional_overview_classification`](#34-3_regional_overview_classification) | `2_non_genre_pruning.parquet`                | `3_regional_overview_classification.parquet`                                 | `is_regional_overview`, `classification_reason` | 401 of 9,729 rows (299 of 6,344 items) tagged `is_regional_overview = true` / `regional_overview` (e.g. "music of Kenya") — not dropped                                          |
 | [`4_regional_classification`](#35-4_regional_classification)                | `3_regional_overview_classification.parquet`, Bronze `wikidata_genre_indigenous_to.parquet`, `manual_regional_overrides.csv` | `4_regional_classification.parquet`                                          | `is_regional`, `regional_reason`    | 3,879 of 6,404 remaining items flagged `is_regional` — 359 seed, 179 indigenous_to, 180 manual_override, 1,614 direct, 1,547 inherited (see [DESIGN.md#23-4_regional_classification](DESIGN.md#23-4_regional_classification))                                      |
 | [`5_canonical_parents`](#36-5_canonical_parents)                                    | `4_regional_classification.parquet`          | `5_canonical_parents.parquet`                                                    | `parent_is_canonical`                   | 2,989 of 9,729 rows have a non-genre parent; 486 rows are roots (`parent_is_canonical = null`)                                                                                      |
-| [`6_canonical_hierarchy`](#37-6_canonical_hierarchy)                                            | `5_canonical_parents.parquet`                    | `6_canonical_hierarchy.parquet` (canonical), `6_regional_hierarchy.parquet` (regional) | prunes to one row per `item_id`     | canonical: 806 final rows from 1,017 items; regional: 5,327 final rows from 5,327 items (seed items are real nodes, not promoted synthetic roots); 211 items vanish from both |
-| [`7_canonical_roots`](#38-7_canonical_roots)                                | `6_canonical_hierarchy.parquet`                        | `7_canonical_roots.parquet`                                                  | filters to `parent_id = null`       | 297 root items, for manual exploration of the "too many roots" open question (see [DESIGN.md#25-6_canonical_hierarchy--6_regional_hierarchy](DESIGN.md#25-6_canonical_hierarchy--6_regional_hierarchy)) |
+| [`6_canonical_hierarchy`](#37-6_canonical_hierarchy)                                            | `5_canonical_parents.parquet`                    | `6_canonical_hierarchy.parquet` | prunes to one row per `item_id` (canonical only) | 806 final rows from 1,017 items                                                                                                              |
+| [`7_regional_hierarchy`](#38-7_regional_hierarchy)                                            | `5_canonical_parents.parquet`                    | `7_regional_hierarchy.parquet` | prunes to one row per `item_id` (regional only) | 5,327 final rows from 5,327 items (seed items are real nodes, not promoted synthetic roots); 211 items vanish from both outputs |
+| [`8_canonical_roots`](#39-8_canonical_roots)                                | `6_canonical_hierarchy.parquet`                        | `8_canonical_roots.parquet`                                                  | filters to `parent_id = null`       | 297 root items, for manual exploration of the "too many roots" open question (see [DESIGN.md#25-6_canonical_hierarchy](DESIGN.md#25-6_canonical_hierarchy)) |
 
 Each step's own section below has the full column definitions and profiling detail behind these
 numbers; see [DESIGN.md](DESIGN.md) for why each step exists and its rules.
@@ -301,12 +304,11 @@ drift as Wikidata's live genre tree changes.
 
 ### 3.7 6_canonical_hierarchy
 
-`6_canonical_hierarchy.parquet` (canonical) and `6_regional_hierarchy.parquet` (regional): the first Silver
-step that actually prunes rather than flags. Reads `5_canonical_parents.parquet` and reduces it to one
-row per genre item, split into two clean, directly-consumable genre hierarchy edge lists — a
-canonical one, excluding every `is_regional = true` item, and a regional one, containing only
-`is_regional = true` items (which now includes the `regional_overview` seed items themselves). See
-[DESIGN.md#25-6_canonical_hierarchy--6_regional_hierarchy](DESIGN.md#25-6_canonical_hierarchy--6_regional_hierarchy) for the two-stage
+`6_canonical_hierarchy.parquet`: the first Silver step that actually prunes rather than flags.
+Reads `5_canonical_parents.parquet` and reduces it to one row per non-regional genre item, producing
+a clean, directly-consumable canonical genre hierarchy edge list — excluding every
+`is_regional = true` item (see [3.8 7_regional_hierarchy](#38-7_regional_hierarchy) for those). See
+[DESIGN.md#25-6_canonical_hierarchy](DESIGN.md#25-6_canonical_hierarchy) for the two-stage
 pruning/collapse rule and the open "too many roots" exploration (the manual-CSV backstops that drop
 non-genre items entirely run earlier, in `2_non_genre_pruning` — see
 [DESIGN.md#21-2_non_genre_pruning](DESIGN.md#21-2_non_genre_pruning)).
@@ -323,27 +325,60 @@ non-genre items entirely run earlier, in `2_non_genre_pruning` — see
 
 **Data profile (as of this writing):**
 
-| Metric                                    | Canonical (`6_canonical_hierarchy`) | Regional (`6_regional_hierarchy`) |
-| ----------------------------------------- | ------------------------: | --------------------------------: |
-| Genre items in scope (distinct `item_id`) |                     1,016 |                             5,328 |
-| Final rows (= distinct `item_id`s)        |                       805 |                             5,328 |
-| Root rows (`parent_id = null`)            |                       297 |                                417 |
+| Metric                                    | Value |
+| ------------------------------------------ | ----: |
+| Genre items in scope (distinct `item_id`) | 1,016 |
+| Final rows (= distinct `item_id`s)        |   805 |
+| Root rows (`parent_id = null`)            |   297 |
 
-Genre items with zero surviving rows in _either_ output (the canonical-style silent vanish): **211**
-— all non-regional, i.e. every one is an "opera"-shaped item, not a regional one. See
-[DESIGN.md#25-6_canonical_hierarchy--6_regional_hierarchy](DESIGN.md#25-6_canonical_hierarchy--6_regional_hierarchy) for why the two outputs diverge here.
+Genre items with zero surviving rows in _either_ this output or `7_regional_hierarchy` (the silent
+vanish): **211** — all non-regional, i.e. every one is an "opera"-shaped item, not a regional one.
+See [DESIGN.md#252-known-consequence--non-genre-orphans-vanish](DESIGN.md#252-known-consequence--non-genre-orphans-vanish)
+for why.
 
 Regenerate with `uv run --package wikidata python -m wikidata.silver.profile` (reads
 `SILVER_OUTPUT_DIR/5_canonical_parents.parquet`, `SILVER_OUTPUT_DIR/6_canonical_hierarchy.parquet`, and
-`SILVER_OUTPUT_DIR/6_regional_hierarchy.parquet`, read-only, no new data fetched) — these numbers
+`SILVER_OUTPUT_DIR/7_regional_hierarchy.parquet`, read-only, no new data fetched) — these numbers
 will drift as Wikidata's live genre tree changes.
 
-### 3.8 7_canonical_roots
+### 3.8 7_regional_hierarchy
 
-`7_canonical_roots.parquet`: `6_canonical_hierarchy.parquet` filtered to rows where `parent_id` is null
+`7_regional_hierarchy.parquet`: mirrors `6_canonical_hierarchy`'s pruning, restricted to
+`is_regional = true` items (which now includes the `regional_overview` seed items themselves).
+Reads `5_canonical_parents.parquet` and reduces it to one row per regional genre item, producing a
+clean, directly-consumable regional genre hierarchy edge list. See
+[DESIGN.md#26-7_regional_hierarchy](DESIGN.md#26-7_regional_hierarchy) for the two-stage
+pruning/collapse rule.
+
+| Column        | Type | Meaning                                                                          |
+| ------------- | ---- | ---------------------------------------------------------------------------------- |
+| item_id       | str  | Wikidata QID of the genre (e.g. `Q1198360`) — **unique in this table**           |
+| item_label    | str  | Same English/`mul`-fallback label as in `1_item_links` (see above), for `item_id`                                                      |
+| item_url      | str  | `https://www.wikidata.org/wiki/` + `item_id`                                     |
+| parent_id     | str? | QID of the single chosen parent, or null for a root                              |
+| parent_label  | str? | Same fallback as `item_label`, for `parent_id`, or null                                           |
+| parent_url    | str? | `https://www.wikidata.org/wiki/` + `parent_id`, or null for a root row           |
+| relation_type | str? | `"P279"` or `"P361"` — which property produced this edge, or null for a root row |
+
+**Data profile (as of this writing):**
+
+| Metric                                    | Value |
+| ------------------------------------------ | ----: |
+| Genre items in scope (distinct `item_id`) | 5,328 |
+| Final rows (= distinct `item_id`s)        | 5,328 |
+| Root rows (`parent_id = null`)            |   417 |
+
+Regenerate with `uv run --package wikidata python -m wikidata.silver.profile` (reads
+`SILVER_OUTPUT_DIR/5_canonical_parents.parquet`, `SILVER_OUTPUT_DIR/6_canonical_hierarchy.parquet`, and
+`SILVER_OUTPUT_DIR/7_regional_hierarchy.parquet`, read-only, no new data fetched) — these numbers
+will drift as Wikidata's live genre tree changes.
+
+### 3.9 8_canonical_roots
+
+`8_canonical_roots.parquet`: `6_canonical_hierarchy.parquet` filtered to rows where `parent_id` is null
 (root items) and reduced to the three item-identifying columns, sorted by `item_label`. Exists
 purely to make manual exploration of the "too many roots" open question
-([DESIGN.md#25-6_canonical_hierarchy--6_regional_hierarchy](DESIGN.md#25-6_canonical_hierarchy--6_regional_hierarchy)) easier — a ready-to-open list of exactly the
+([DESIGN.md#253-under-exploration--root-count](DESIGN.md#253-under-exploration--root-count)) easier — a ready-to-open list of exactly the
 items in question, instead of re-deriving the filter each time (as
 `notebooks/explore_genre_tree.ipynb` currently does inline). Not consumed by any later step and not
 itself part of the pruning chain — it's a read view of `6_canonical_hierarchy`, not new information.
@@ -355,6 +390,6 @@ itself part of the pruning chain — it's a read view of `6_canonical_hierarchy`
 | item_url   | str  | `https://www.wikidata.org/wiki/` + `item_id`   |
 
 **Data profile (as of this writing):** 297 rows — see
-[DESIGN.md#25-6_canonical_hierarchy--6_regional_hierarchy](DESIGN.md#25-6_canonical_hierarchy--6_regional_hierarchy)'s "Under exploration" callout for context on
+[DESIGN.md#253-under-exploration--root-count](DESIGN.md#253-under-exploration--root-count) for context on
 why this count is expected to shrink as the multi-parent collapse heuristic and regional
 classification rules mature.
