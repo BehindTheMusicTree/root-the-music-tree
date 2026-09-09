@@ -154,9 +154,9 @@ INDIGENOUS_TO_ROWS = [
 
 
 def _write_genre_classification(tmp_path: Path) -> Path:
-    genre_classification_path = tmp_path / "2_regional_overview_classification.parquet"
-    pl.DataFrame(GENRE_CLASSIFICATION_ROWS).write_parquet(genre_classification_path)
-    return genre_classification_path
+    regional_overview_classification_path = tmp_path / "3_regional_overview_classification.parquet"
+    pl.DataFrame(GENRE_CLASSIFICATION_ROWS).write_parquet(regional_overview_classification_path)
+    return regional_overview_classification_path
 
 
 def _write_indigenous_to(tmp_path: Path) -> Path:
@@ -178,62 +178,31 @@ def _write_manual_overrides(tmp_path: Path) -> Path:
     return manual_overrides_path
 
 
-def _write_manual_theme_genres(tmp_path: Path, rows: list[dict] | None = None) -> Path:
-    path = tmp_path / "manual_theme_genres.csv"
-    schema = {"item_id": pl.Utf8, "item_label": pl.Utf8, "reason": pl.Utf8}
-    pl.DataFrame(rows or [], schema=schema).write_csv(path)
-    return path
-
-
-def _write_manual_technique_genres(tmp_path: Path, rows: list[dict] | None = None) -> Path:
-    path = tmp_path / "manual_technique_genres.csv"
-    schema = {"item_id": pl.Utf8, "item_label": pl.Utf8, "reason": pl.Utf8}
-    pl.DataFrame(rows or [], schema=schema).write_csv(path)
-    return path
-
-
-def _write_manual_out_of_scope_genres(tmp_path: Path, rows: list[dict] | None = None) -> Path:
-    path = tmp_path / "manual_out_of_scope_genres.csv"
-    schema = {"item_id": pl.Utf8, "item_label": pl.Utf8, "reason": pl.Utf8}
-    pl.DataFrame(rows or [], schema=schema).write_csv(path)
-    return path
-
-
 def _classify_regional_genres(
-    tmp_path: Path,
-    genre_classification_path: Path,
+    regional_overview_classification_path: Path,
     indigenous_to_path: Path,
     manual_overrides_path: Path,
     output_dir: Path,
-    theme_rows: list[dict] | None = None,
-    technique_rows: list[dict] | None = None,
-    out_of_scope_rows: list[dict] | None = None,
 ) -> Path:
-    manual_theme_genres_path = _write_manual_theme_genres(tmp_path, theme_rows)
-    manual_technique_genres_path = _write_manual_technique_genres(tmp_path, technique_rows)
-    manual_out_of_scope_genres_path = _write_manual_out_of_scope_genres(tmp_path, out_of_scope_rows)
     return sr.classify_regional_genres(
-        genre_classification_path,
+        regional_overview_classification_path,
         indigenous_to_path,
         manual_overrides_path,
-        manual_theme_genres_path,
-        manual_technique_genres_path,
-        manual_out_of_scope_genres_path,
         output_dir,
     )
 
 
 def test_classify_regional_genres_cascades_from_seeds(tmp_path: Path) -> None:
-    genre_classification_path = _write_genre_classification(tmp_path)
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
     indigenous_to_path = _write_indigenous_to(tmp_path)
     manual_overrides_path = _write_manual_overrides(tmp_path)
     output_dir = tmp_path / "silver"
 
     result = _classify_regional_genres(
-        tmp_path, genre_classification_path, indigenous_to_path, manual_overrides_path, output_dir
+        regional_overview_classification_path, indigenous_to_path, manual_overrides_path, output_dir
     )
 
-    assert result == output_dir / "3_regional_classification.parquet"
+    assert result == output_dir / "4_regional_classification.parquet"
     df = pl.read_parquet(result)
 
     by_item = {row["item_id"]: (row["is_regional"], row["regional_reason"]) for row in df.unique("item_id").to_dicts()}
@@ -252,7 +221,7 @@ def test_classify_regional_genres_cascades_from_seeds(tmp_path: Path) -> None:
 
 
 def test_classify_regional_genres_treats_manual_overview_reclassification_as_seed(tmp_path: Path) -> None:
-    genre_classification_path = tmp_path / "2_regional_overview_classification.parquet"
+    regional_overview_classification_path = tmp_path / "3_regional_overview_classification.parquet"
     pl.DataFrame(
         [
             # European folk music: reclassified as a regional overview (not via the "music of "
@@ -281,7 +250,7 @@ def test_classify_regional_genres_treats_manual_overview_reclassification_as_see
                 "classification_reason": None,
             },
         ]
-    ).write_parquet(genre_classification_path)
+    ).write_parquet(regional_overview_classification_path)
     indigenous_to_path = _write_indigenous_to(tmp_path)
     manual_overrides_path = tmp_path / "manual_regional_overrides.csv"
     pl.DataFrame(
@@ -291,7 +260,7 @@ def test_classify_regional_genres_treats_manual_overview_reclassification_as_see
     output_dir = tmp_path / "silver"
 
     result = _classify_regional_genres(
-        tmp_path, genre_classification_path, indigenous_to_path, manual_overrides_path, output_dir
+        regional_overview_classification_path, indigenous_to_path, manual_overrides_path, output_dir
     )
 
     df = pl.read_parquet(result)
@@ -303,13 +272,13 @@ def test_classify_regional_genres_treats_manual_overview_reclassification_as_see
 
 
 def test_classify_regional_genres_nests_override_under_overview_item(tmp_path: Path) -> None:
-    genre_classification_path = _write_genre_classification(tmp_path)
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
     indigenous_to_path = _write_indigenous_to(tmp_path)
     manual_overrides_path = _write_manual_overrides(tmp_path)
     output_dir = tmp_path / "silver"
 
     result = _classify_regional_genres(
-        tmp_path, genre_classification_path, indigenous_to_path, manual_overrides_path, output_dir
+        regional_overview_classification_path, indigenous_to_path, manual_overrides_path, output_dir
     )
 
     df = pl.read_parquet(result)
@@ -323,7 +292,7 @@ def test_classify_regional_genres_nests_override_under_overview_item(tmp_path: P
 
 
 def test_classify_regional_genres_strips_whitespace_padded_overview_item_id(tmp_path: Path) -> None:
-    genre_classification_path = _write_genre_classification(tmp_path)
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
     indigenous_to_path = _write_indigenous_to(tmp_path)
     manual_overrides_path = tmp_path / "manual_regional_overrides.csv"
     pl.DataFrame(
@@ -337,7 +306,7 @@ def test_classify_regional_genres_strips_whitespace_padded_overview_item_id(tmp_
     output_dir = tmp_path / "silver"
 
     result = _classify_regional_genres(
-        tmp_path, genre_classification_path, indigenous_to_path, manual_overrides_path, output_dir
+        regional_overview_classification_path, indigenous_to_path, manual_overrides_path, output_dir
     )
 
     df = pl.read_parquet(result)
@@ -347,7 +316,7 @@ def test_classify_regional_genres_strips_whitespace_padded_overview_item_id(tmp_
 
 
 def test_classify_regional_genres_requires_known_override_item_id(tmp_path: Path) -> None:
-    genre_classification_path = _write_genre_classification(tmp_path)
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
     indigenous_to_path = _write_indigenous_to(tmp_path)
     manual_overrides_path = tmp_path / "manual_regional_overrides.csv"
     pl.DataFrame(
@@ -362,12 +331,12 @@ def test_classify_regional_genres_requires_known_override_item_id(tmp_path: Path
 
     with pytest.raises(ValueError, match="Q999999999"):
         _classify_regional_genres(
-            tmp_path, genre_classification_path, indigenous_to_path, manual_overrides_path, output_dir
+            regional_overview_classification_path, indigenous_to_path, manual_overrides_path, output_dir
         )
 
 
 def test_classify_regional_genres_requires_known_overview_item_id(tmp_path: Path) -> None:
-    genre_classification_path = _write_genre_classification(tmp_path)
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
     indigenous_to_path = _write_indigenous_to(tmp_path)
     manual_overrides_path = tmp_path / "manual_regional_overrides.csv"
     pl.DataFrame(
@@ -382,12 +351,12 @@ def test_classify_regional_genres_requires_known_overview_item_id(tmp_path: Path
 
     with pytest.raises(ValueError, match="Q999999999"):
         _classify_regional_genres(
-            tmp_path, genre_classification_path, indigenous_to_path, manual_overrides_path, output_dir
+            regional_overview_classification_path, indigenous_to_path, manual_overrides_path, output_dir
         )
 
 
 def test_classify_regional_genres_requires_overview_item_id_be_regional_overview(tmp_path: Path) -> None:
-    genre_classification_path = _write_genre_classification(tmp_path)
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
     indigenous_to_path = _write_indigenous_to(tmp_path)
     manual_overrides_path = tmp_path / "manual_regional_overrides.csv"
     pl.DataFrame(
@@ -402,12 +371,12 @@ def test_classify_regional_genres_requires_overview_item_id_be_regional_overview
 
     with pytest.raises(ValueError, match="Q8341"):
         _classify_regional_genres(
-            tmp_path, genre_classification_path, indigenous_to_path, manual_overrides_path, output_dir
+            regional_overview_classification_path, indigenous_to_path, manual_overrides_path, output_dir
         )
 
 
 def test_classify_regional_genres_requires_overview_item_id_column(tmp_path: Path) -> None:
-    genre_classification_path = _write_genre_classification(tmp_path)
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
     indigenous_to_path = _write_indigenous_to(tmp_path)
     manual_overrides_path = tmp_path / "manual_regional_overrides.csv"
     pl.DataFrame({"item_id": ["Q4118941"], "item_label": ["mezwed"], "reason": ["test override"]}).write_csv(
@@ -417,14 +386,14 @@ def test_classify_regional_genres_requires_overview_item_id_column(tmp_path: Pat
 
     with pytest.raises(ValueError, match="overview_item_id"):
         _classify_regional_genres(
-            tmp_path, genre_classification_path, indigenous_to_path, manual_overrides_path, output_dir
+            regional_overview_classification_path, indigenous_to_path, manual_overrides_path, output_dir
         )
 
 
 def test_classify_regional_genres_requires_overview_item_id_value_when_column_is_all_null(
     tmp_path: Path,
 ) -> None:
-    genre_classification_path = _write_genre_classification(tmp_path)
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
     indigenous_to_path = _write_indigenous_to(tmp_path)
     manual_overrides_path = tmp_path / "manual_regional_overrides.csv"
     # An entirely-empty overview_item_id column makes Polars infer it as Null dtype rather than
@@ -435,12 +404,12 @@ def test_classify_regional_genres_requires_overview_item_id_value_when_column_is
 
     with pytest.raises(ValueError, match="Q4118941"):
         _classify_regional_genres(
-            tmp_path, genre_classification_path, indigenous_to_path, manual_overrides_path, output_dir
+            regional_overview_classification_path, indigenous_to_path, manual_overrides_path, output_dir
         )
 
 
 def test_classify_regional_genres_requires_overview_item_id_value(tmp_path: Path) -> None:
-    genre_classification_path = _write_genre_classification(tmp_path)
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
     indigenous_to_path = _write_indigenous_to(tmp_path)
     manual_overrides_path = tmp_path / "manual_regional_overrides.csv"
     pl.DataFrame(
@@ -455,12 +424,12 @@ def test_classify_regional_genres_requires_overview_item_id_value(tmp_path: Path
 
     with pytest.raises(ValueError, match="Q4118941"):
         _classify_regional_genres(
-            tmp_path, genre_classification_path, indigenous_to_path, manual_overrides_path, output_dir
+            regional_overview_classification_path, indigenous_to_path, manual_overrides_path, output_dir
         )
 
 
 def test_classify_regional_genres_requires_non_blank_overview_item_id_value(tmp_path: Path) -> None:
-    genre_classification_path = _write_genre_classification(tmp_path)
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
     indigenous_to_path = _write_indigenous_to(tmp_path)
     manual_overrides_path = tmp_path / "manual_regional_overrides.csv"
     pl.DataFrame(
@@ -475,269 +444,18 @@ def test_classify_regional_genres_requires_non_blank_overview_item_id_value(tmp_
 
     with pytest.raises(ValueError, match="Q4118941"):
         _classify_regional_genres(
-            tmp_path, genre_classification_path, indigenous_to_path, manual_overrides_path, output_dir
+            regional_overview_classification_path, indigenous_to_path, manual_overrides_path, output_dir
         )
 
 
 def test_classify_regional_genres_creates_output_dir(tmp_path: Path) -> None:
-    genre_classification_path = _write_genre_classification(tmp_path)
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
     indigenous_to_path = _write_indigenous_to(tmp_path)
     manual_overrides_path = _write_manual_overrides(tmp_path)
     output_dir = tmp_path / "does" / "not" / "exist"
 
     _classify_regional_genres(
-        tmp_path, genre_classification_path, indigenous_to_path, manual_overrides_path, output_dir
+        regional_overview_classification_path, indigenous_to_path, manual_overrides_path, output_dir
     )
 
     assert output_dir.is_dir()
-
-
-def _write_empty_manual_overrides(tmp_path: Path) -> Path:
-    manual_overrides_path = tmp_path / "manual_regional_overrides.csv"
-    pl.DataFrame(
-        {"item_id": [], "item_label": [], "reason": [], "overview_item_id": []},
-        schema={"item_id": pl.Utf8, "item_label": pl.Utf8, "reason": pl.Utf8, "overview_item_id": pl.Utf8},
-    ).write_csv(manual_overrides_path)
-    return manual_overrides_path
-
-
-def _write_dropped_item_cascade_fixture(tmp_path: Path) -> Path:
-    genre_classification_path = tmp_path / "2_regional_overview_classification.parquet"
-    pl.DataFrame(
-        [
-            # music of X: the seed
-            {
-                "item_id": "Q1",
-                "item_label": "music of X",
-                "parent_id": None,
-                "parent_label": None,
-                "relation_type": None,
-                "item_url": "https://www.wikidata.org/wiki/Q1",
-                "parent_url": None,
-                "is_regional_overview": True,
-                "classification_reason": "regional_overview",
-            },
-            # a mistagged item, direct child of the seed — dropped in the tests below
-            {
-                "item_id": "Q2",
-                "item_label": "mistagged item",
-                "parent_id": "Q1",
-                "parent_label": "music of X",
-                "relation_type": "P279",
-                "item_url": "https://www.wikidata.org/wiki/Q2",
-                "parent_url": "https://www.wikidata.org/wiki/Q1",
-                "is_regional_overview": False,
-                "classification_reason": None,
-            },
-            # a real genre, whose only parent edge is into the mistagged item above — without
-            # dropping Q2 before the cascade, this would inherit is_regional through it
-            {
-                "item_id": "Q3",
-                "item_label": "a real genre",
-                "parent_id": "Q2",
-                "parent_label": "mistagged item",
-                "relation_type": "P279",
-                "item_url": "https://www.wikidata.org/wiki/Q3",
-                "parent_url": "https://www.wikidata.org/wiki/Q2",
-                "is_regional_overview": False,
-                "classification_reason": None,
-            },
-        ]
-    ).write_parquet(genre_classification_path)
-    return genre_classification_path
-
-
-def test_classify_regional_genres_drops_theme_items_before_cascading(tmp_path: Path) -> None:
-    genre_classification_path = _write_dropped_item_cascade_fixture(tmp_path)
-    indigenous_to_path = _write_indigenous_to(tmp_path)
-    manual_overrides_path = _write_empty_manual_overrides(tmp_path)
-    output_dir = tmp_path / "silver"
-
-    result = _classify_regional_genres(
-        tmp_path,
-        genre_classification_path,
-        indigenous_to_path,
-        manual_overrides_path,
-        output_dir,
-        theme_rows=[{"item_id": "Q2", "item_label": "mistagged item", "reason": "test"}],
-    )
-
-    df = pl.read_parquet(result)
-    # the dropped item is gone entirely
-    assert "Q2" not in set(df.select("item_id").unique().to_series())
-    # its child no longer inherits regional status through the severed edge
-    real_genre_row = df.filter(pl.col("item_id") == "Q3").row(0, named=True)
-    assert real_genre_row["is_regional"] is False
-    assert real_genre_row["regional_reason"] is None
-
-
-def test_classify_regional_genres_drops_technique_items_before_cascading(tmp_path: Path) -> None:
-    genre_classification_path = _write_dropped_item_cascade_fixture(tmp_path)
-    indigenous_to_path = _write_indigenous_to(tmp_path)
-    manual_overrides_path = _write_empty_manual_overrides(tmp_path)
-    output_dir = tmp_path / "silver"
-
-    result = _classify_regional_genres(
-        tmp_path,
-        genre_classification_path,
-        indigenous_to_path,
-        manual_overrides_path,
-        output_dir,
-        technique_rows=[{"item_id": "Q2", "item_label": "mistagged item", "reason": "test"}],
-    )
-
-    df = pl.read_parquet(result)
-    assert "Q2" not in set(df.select("item_id").unique().to_series())
-    real_genre_row = df.filter(pl.col("item_id") == "Q3").row(0, named=True)
-    assert real_genre_row["is_regional"] is False
-    assert real_genre_row["regional_reason"] is None
-
-
-def test_classify_regional_genres_drops_out_of_scope_items_before_cascading(tmp_path: Path) -> None:
-    genre_classification_path = _write_dropped_item_cascade_fixture(tmp_path)
-    indigenous_to_path = _write_indigenous_to(tmp_path)
-    manual_overrides_path = _write_empty_manual_overrides(tmp_path)
-    output_dir = tmp_path / "silver"
-
-    result = _classify_regional_genres(
-        tmp_path,
-        genre_classification_path,
-        indigenous_to_path,
-        manual_overrides_path,
-        output_dir,
-        out_of_scope_rows=[{"item_id": "Q2", "item_label": "mistagged item", "reason": "test"}],
-    )
-
-    df = pl.read_parquet(result)
-    assert "Q2" not in set(df.select("item_id").unique().to_series())
-    real_genre_row = df.filter(pl.col("item_id") == "Q3").row(0, named=True)
-    assert real_genre_row["is_regional"] is False
-    assert real_genre_row["regional_reason"] is None
-
-
-def test_classify_regional_genres_raises_on_unknown_theme_item_id(tmp_path: Path) -> None:
-    genre_classification_path = _write_genre_classification(tmp_path)
-    indigenous_to_path = _write_indigenous_to(tmp_path)
-    manual_overrides_path = _write_manual_overrides(tmp_path)
-    output_dir = tmp_path / "silver"
-
-    with pytest.raises(ValueError, match="Q0000000"):
-        _classify_regional_genres(
-            tmp_path,
-            genre_classification_path,
-            indigenous_to_path,
-            manual_overrides_path,
-            output_dir,
-            theme_rows=[{"item_id": "Q0000000", "item_label": "not in the tree", "reason": "test"}],
-        )
-
-
-def test_classify_regional_genres_raises_on_blank_theme_item_id(tmp_path: Path) -> None:
-    genre_classification_path = _write_genre_classification(tmp_path)
-    indigenous_to_path = _write_indigenous_to(tmp_path)
-    manual_overrides_path = _write_manual_overrides(tmp_path)
-    output_dir = tmp_path / "silver"
-
-    with pytest.raises(ValueError, match="null/blank"):
-        _classify_regional_genres(
-            tmp_path,
-            genre_classification_path,
-            indigenous_to_path,
-            manual_overrides_path,
-            output_dir,
-            theme_rows=[{"item_id": "", "item_label": "blank id", "reason": "test"}],
-        )
-
-
-def test_classify_regional_genres_raises_on_duplicate_theme_item_id(tmp_path: Path) -> None:
-    genre_classification_path = _write_genre_classification(tmp_path)
-    indigenous_to_path = _write_indigenous_to(tmp_path)
-    manual_overrides_path = _write_manual_overrides(tmp_path)
-    output_dir = tmp_path / "silver"
-
-    with pytest.raises(ValueError, match="duplicate"):
-        _classify_regional_genres(
-            tmp_path,
-            genre_classification_path,
-            indigenous_to_path,
-            manual_overrides_path,
-            output_dir,
-            theme_rows=[
-                {"item_id": "Q9778", "item_label": "popular music", "reason": "test"},
-                {"item_id": "Q9778", "item_label": "popular music", "reason": "test duplicate"},
-            ],
-        )
-
-
-def test_classify_regional_genres_raises_on_unknown_technique_item_id(tmp_path: Path) -> None:
-    genre_classification_path = _write_genre_classification(tmp_path)
-    indigenous_to_path = _write_indigenous_to(tmp_path)
-    manual_overrides_path = _write_manual_overrides(tmp_path)
-    output_dir = tmp_path / "silver"
-
-    with pytest.raises(ValueError, match="Q0000000"):
-        _classify_regional_genres(
-            tmp_path,
-            genre_classification_path,
-            indigenous_to_path,
-            manual_overrides_path,
-            output_dir,
-            technique_rows=[{"item_id": "Q0000000", "item_label": "not in the tree", "reason": "test"}],
-        )
-
-
-def test_classify_regional_genres_raises_on_duplicate_technique_item_id(tmp_path: Path) -> None:
-    genre_classification_path = _write_genre_classification(tmp_path)
-    indigenous_to_path = _write_indigenous_to(tmp_path)
-    manual_overrides_path = _write_manual_overrides(tmp_path)
-    output_dir = tmp_path / "silver"
-
-    with pytest.raises(ValueError, match="duplicate"):
-        _classify_regional_genres(
-            tmp_path,
-            genre_classification_path,
-            indigenous_to_path,
-            manual_overrides_path,
-            output_dir,
-            technique_rows=[
-                {"item_id": "Q9778", "item_label": "popular music", "reason": "test"},
-                {"item_id": "Q9778", "item_label": "popular music", "reason": "test duplicate"},
-            ],
-        )
-
-
-def test_classify_regional_genres_raises_on_unknown_out_of_scope_item_id(tmp_path: Path) -> None:
-    genre_classification_path = _write_genre_classification(tmp_path)
-    indigenous_to_path = _write_indigenous_to(tmp_path)
-    manual_overrides_path = _write_manual_overrides(tmp_path)
-    output_dir = tmp_path / "silver"
-
-    with pytest.raises(ValueError, match="Q0000000"):
-        _classify_regional_genres(
-            tmp_path,
-            genre_classification_path,
-            indigenous_to_path,
-            manual_overrides_path,
-            output_dir,
-            out_of_scope_rows=[{"item_id": "Q0000000", "item_label": "not in the tree", "reason": "test"}],
-        )
-
-
-def test_classify_regional_genres_raises_on_duplicate_out_of_scope_item_id(tmp_path: Path) -> None:
-    genre_classification_path = _write_genre_classification(tmp_path)
-    indigenous_to_path = _write_indigenous_to(tmp_path)
-    manual_overrides_path = _write_manual_overrides(tmp_path)
-    output_dir = tmp_path / "silver"
-
-    with pytest.raises(ValueError, match="duplicate"):
-        _classify_regional_genres(
-            tmp_path,
-            genre_classification_path,
-            indigenous_to_path,
-            manual_overrides_path,
-            output_dir,
-            out_of_scope_rows=[
-                {"item_id": "Q9778", "item_label": "popular music", "reason": "test"},
-                {"item_id": "Q9778", "item_label": "popular music", "reason": "test duplicate"},
-            ],
-        )

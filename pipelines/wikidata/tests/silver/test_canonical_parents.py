@@ -79,7 +79,7 @@ REGIONAL_CLASSIFICATION_ROWS = [
 
 
 def _write_regional_classification(tmp_path: Path) -> Path:
-    regional_classification_path = tmp_path / "3_regional_classification.parquet"
+    regional_classification_path = tmp_path / "4_regional_classification.parquet"
     pl.DataFrame(REGIONAL_CLASSIFICATION_ROWS).write_parquet(regional_classification_path)
     return regional_classification_path
 
@@ -99,7 +99,7 @@ def test_flag_canonical_parents_marks_parent_status(tmp_path: Path) -> None:
 
     result = sg.flag_canonical_parents(regional_classification_path, manual_canonical_parents_path, output_dir)
 
-    assert result == output_dir / "4_canonical_parents.parquet"
+    assert result == output_dir / "5_canonical_parents.parquet"
     parent_is_canonical_by_item = {
         row["item_id"]: row["parent_is_canonical"] for row in pl.read_parquet(result).to_dicts()
     }

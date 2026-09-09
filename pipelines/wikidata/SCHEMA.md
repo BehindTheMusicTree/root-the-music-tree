@@ -21,11 +21,12 @@ pipeline overview.
   - [3. Silver](#3-silver)
     - [3.1 Overview](#31-overview)
     - [3.2 1_item_links](#32-1_item_links)
-    - [3.3 2_regional_overview_classification](#33-2_regional_overview_classification)
-    - [3.4 3_regional_classification](#34-3_regional_classification)
-    - [3.5 4_canonical_parents](#35-4_canonical_parents)
-    - [3.6 5_canonical_hierarchy](#36-5_canonical_hierarchy)
-    - [3.7 6_canonical_roots](#37-6_canonical_roots)
+    - [3.3 2_non_genre_pruning](#33-2_non_genre_pruning)
+    - [3.4 3_regional_overview_classification](#34-3_regional_overview_classification)
+    - [3.5 4_regional_classification](#35-4_regional_classification)
+    - [3.6 5_canonical_parents](#36-5_canonical_parents)
+    - [3.7 6_canonical_hierarchy](#37-6_canonical_hierarchy)
+    - [3.8 7_canonical_roots](#38-7_canonical_roots)
 
 ## 1. Wikidata properties used
 
@@ -69,7 +70,7 @@ music" `wdt:P2341` `wd:Q49103` "Han Chinese"). This is an ethnographic attribute
 itself, not a genre-to-genre taxonomy edge like `P279`/`P361` — its cardinality is independent of
 an item's parent count, so it's ingested into its own Bronze table
 (`wikidata_genre_indigenous_to.parquet`, see below) rather than into `wikidata_genre_tree.parquet`.
-See [DESIGN.md#22-3_regional_classification](DESIGN.md#22-3_regional_classification) for why it's
+See [DESIGN.md#23-4_regional_classification](DESIGN.md#23-4_regional_classification) for why it's
 needed.
 
 ### 1.5 P495 ("country of origin")
@@ -79,7 +80,7 @@ Links an item to the country it originated in (e.g. `wd:Q1198131` "morna" `wdt:P
 edge, independent of an item's `P279`/`P361` parent count, so it's ingested into its own Bronze
 table (`wikidata_genre_country_of_origin.parquet`, see below) rather than into
 `wikidata_genre_tree.parquet`. See
-[DESIGN.md#22-3_regional_classification](DESIGN.md#22-3_regional_classification) for why it's not
+[DESIGN.md#23-4_regional_classification](DESIGN.md#23-4_regional_classification) for why it's not
 used as a classification signal.
 
 ## 2. Bronze
@@ -146,26 +147,27 @@ own (as of this writing: 2,496 rows).
 
 ## 3. Silver
 
-All five steps below are produced by `wikidata.silver`. `1_item_links` and
-`2_regional_overview_classification` preserve the Bronze edge-list grain 1:1 (`item_id` still not
-unique) — neither drops rows; downstream consumers filter on the added columns themselves.
-`3_regional_classification` also preserves that grain except for a small number of rows dropped via
+All six steps below are produced by `wikidata.silver`. `1_item_links` preserves the Bronze
+edge-list grain 1:1 (`item_id` still not unique) — it doesn't drop rows; downstream consumers
+filter on the added columns themselves. `2_non_genre_pruning` is the step that drops rows, via
 manual CSV backstops (theme/technique/out-of-scope items — see
-[DESIGN.md#224-manual-csv-backstops-for-non-genre-pruning](DESIGN.md#224-manual-csv-backstops-for-non-genre-pruning)),
-and `4_canonical_parents` preserves whatever grain it receives unchanged. `5_canonical_hierarchy` is
-the step that prunes to the final hierarchy shape: it's the first where `item_id` is unique — see
-below.
+[DESIGN.md#21-2_non_genre_pruning](DESIGN.md#21-2_non_genre_pruning)), run as early as possible so
+every step downstream works with a smaller, cleaner tree. `3_regional_overview_classification`
+preserves whatever grain it receives unchanged aside from its own added columns, and so do
+`4_regional_classification` and `5_canonical_parents`. `6_canonical_hierarchy` is the step that
+prunes to the final hierarchy shape: it's the first where `item_id` is unique — see below.
 
 ### 3.1 Overview
 
 | Step                                                                        | Reads                                        | Writes                                                                       | Adds                                | Key result (as of this writing)                                                                                                                                                 |
 | --------------------------------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`1_item_links`](#32-1_item_links)                                          | Bronze `wikidata_genre_tree.parquet`         | `1_item_links.parquet`                                                       | `item_url`, `parent_url`, `has_item_label`, `has_parent_label` | `item_url` populated for all 9,729 rows; `parent_url` null only for the 486 root rows                                                                                            |
-| [`2_regional_overview_classification`](#33-2_regional_overview_classification) | `1_item_links.parquet`                       | `2_regional_overview_classification.parquet`                                 | `is_regional_overview`, `classification_reason` | 401 of 9,729 rows (299 of 6,344 items) tagged `is_regional_overview = true` / `regional_overview` (e.g. "music of Kenya") — not dropped                                          |
-| [`3_regional_classification`](#34-3_regional_classification)                | `2_regional_overview_classification.parquet`, Bronze `wikidata_genre_indigenous_to.parquet`, `manual_regional_overrides.csv`, `manual_theme_genres.csv`, `manual_technique_genres.csv`, `manual_out_of_scope_genres.csv` | `3_regional_classification.parquet`                                          | `is_regional`, `regional_reason`    | theme/technique/out-of-scope items dropped first; 3,879 of 6,404 remaining items flagged `is_regional` — 359 seed, 179 indigenous_to, 180 manual_override, 1,614 direct, 1,547 inherited (see [DESIGN.md#22-3_regional_classification](DESIGN.md#22-3_regional_classification))                                      |
-| [`4_canonical_parents`](#35-4_canonical_parents)                                    | `3_regional_classification.parquet`          | `4_canonical_parents.parquet`                                                    | `parent_is_canonical`                   | 2,989 of 9,729 rows have a non-genre parent; 486 rows are roots (`parent_is_canonical = null`)                                                                                      |
-| [`5_canonical_hierarchy`](#36-5_canonical_hierarchy)                                            | `4_canonical_parents.parquet`                    | `5_canonical_hierarchy.parquet` (canonical), `5_regional_hierarchy.parquet` (regional) | prunes to one row per `item_id`     | canonical: 806 final rows from 1,017 items; regional: 5,327 final rows from 5,327 items (seed items are real nodes, not promoted synthetic roots); 211 items vanish from both |
-| [`6_canonical_roots`](#37-6_canonical_roots)                                | `5_canonical_hierarchy.parquet`                        | `6_canonical_roots.parquet`                                                  | filters to `parent_id = null`       | 297 root items, for manual exploration of the "too many roots" open question (see [DESIGN.md#24-5_canonical_hierarchy](DESIGN.md#24-5_canonical_hierarchy)) |
+| [`2_non_genre_pruning`](#33-2_non_genre_pruning)                            | `1_item_links.parquet`, `manual_theme_genres.csv`, `manual_technique_genres.csv`, `manual_out_of_scope_genres.csv` | `2_non_genre_pruning.parquet`                                                | none — drops rows only              | theme/technique/out-of-scope items dropped entirely (see [DESIGN.md#21-2_non_genre_pruning](DESIGN.md#21-2_non_genre_pruning))                                                    |
+| [`3_regional_overview_classification`](#34-3_regional_overview_classification) | `2_non_genre_pruning.parquet`                | `3_regional_overview_classification.parquet`                                 | `is_regional_overview`, `classification_reason` | 401 of 9,729 rows (299 of 6,344 items) tagged `is_regional_overview = true` / `regional_overview` (e.g. "music of Kenya") — not dropped                                          |
+| [`4_regional_classification`](#35-4_regional_classification)                | `3_regional_overview_classification.parquet`, Bronze `wikidata_genre_indigenous_to.parquet`, `manual_regional_overrides.csv` | `4_regional_classification.parquet`                                          | `is_regional`, `regional_reason`    | 3,879 of 6,404 remaining items flagged `is_regional` — 359 seed, 179 indigenous_to, 180 manual_override, 1,614 direct, 1,547 inherited (see [DESIGN.md#23-4_regional_classification](DESIGN.md#23-4_regional_classification))                                      |
+| [`5_canonical_parents`](#36-5_canonical_parents)                                    | `4_regional_classification.parquet`          | `5_canonical_parents.parquet`                                                    | `parent_is_canonical`                   | 2,989 of 9,729 rows have a non-genre parent; 486 rows are roots (`parent_is_canonical = null`)                                                                                      |
+| [`6_canonical_hierarchy`](#37-6_canonical_hierarchy)                                            | `5_canonical_parents.parquet`                    | `6_canonical_hierarchy.parquet` (canonical), `6_regional_hierarchy.parquet` (regional) | prunes to one row per `item_id`     | canonical: 806 final rows from 1,017 items; regional: 5,327 final rows from 5,327 items (seed items are real nodes, not promoted synthetic roots); 211 items vanish from both |
+| [`7_canonical_roots`](#38-7_canonical_roots)                                | `6_canonical_hierarchy.parquet`                        | `7_canonical_roots.parquet`                                                  | filters to `parent_id = null`       | 297 root items, for manual exploration of the "too many roots" open question (see [DESIGN.md#25-6_canonical_hierarchy](DESIGN.md#25-6_canonical_hierarchy)) |
 
 Each step's own section below has the full column definitions and profiling detail behind these
 numbers; see [DESIGN.md](DESIGN.md) for why each step exists and its rules.
@@ -195,12 +197,34 @@ Regenerate with `uv run --package wikidata python -m wikidata.silver.profile` (r
 `SILVER_OUTPUT_DIR/1_item_links.parquet`, read-only, no new data fetched) — these numbers will
 drift as Wikidata's live genre tree changes.
 
-### 3.3 2_regional_overview_classification
+### 3.3 2_non_genre_pruning
 
-`2_regional_overview_classification.parquet`: `1_item_links.parquet` unchanged, plus two
+`2_non_genre_pruning.parquet`: `1_item_links.parquet` with theme, technique, and out-of-scope
+items dropped entirely, per three manual CSV backstops. Otherwise unchanged — no columns added.
+Runs as the very first classification step, before `3_regional_overview_classification` and
+`4_regional_classification`, so every step downstream works with a smaller, cleaner tree. See
+[DESIGN.md#21-2_non_genre_pruning](DESIGN.md#21-2_non_genre_pruning) for the three CSVs' scope and
+the fail-fast validation each one gets.
+
+No columns added; schema is identical to `1_item_links.parquet`.
+
+**Data profile (as of this writing):**
+
+| Metric                                     |  Rows | Distinct `item_id`s |
+| ------------------------------------------- | ----: | -------------------: |
+| Total (before drop)                        | 9,729 |                6,344 |
+| Dropped (theme/technique/out-of-scope)      |     — |                    — |
+
+Regenerate with `uv run --package wikidata python -m wikidata.silver.profile` (reads
+`SILVER_OUTPUT_DIR/2_non_genre_pruning.parquet`, read-only, no new data fetched) — these numbers
+will drift as Wikidata's live genre tree changes.
+
+### 3.4 3_regional_overview_classification
+
+`3_regional_overview_classification.parquet`: `2_non_genre_pruning.parquet` unchanged, plus two
 columns classifying whether each row's `item_id` is a regional-overview article (e.g. "music of Kenya")
 rather than an actual musical style. See
-[DESIGN.md#21-2_regional_overview_classification](DESIGN.md#21-2_regional_overview_classification)
+[DESIGN.md#22-3_regional_overview_classification](DESIGN.md#22-3_regional_overview_classification)
 for why this classification exists, its rule, and the manual-CSV backstop mechanics.
 
 | Column                | Type | Meaning                                                                                    |
@@ -217,18 +241,16 @@ for why this classification exists, its rule, and the manual-CSV backstop mechan
 | `is_regional_overview = true` (`regional_overview`) |   401 |                 299 |
 
 Regenerate with `uv run --package wikidata python -m wikidata.silver.profile` (reads
-`SILVER_OUTPUT_DIR/2_regional_overview_classification.parquet`, read-only, no new data fetched) — these numbers
+`SILVER_OUTPUT_DIR/3_regional_overview_classification.parquet`, read-only, no new data fetched) — these numbers
 will drift as Wikidata's live genre tree changes.
 
-### 3.4 3_regional_classification
+### 3.5 4_regional_classification
 
-`3_regional_classification.parquet`: `2_regional_overview_classification.parquet`, first with theme,
-technique, and out-of-scope items dropped entirely (per three manual CSV backstops — see
-[DESIGN.md#224-manual-csv-backstops-for-non-genre-pruning](DESIGN.md#224-manual-csv-backstops-for-non-genre-pruning)),
-then unchanged aside from two added columns flagging whether each row's `item_id` is a **regional
-genre** — nationally or ethnically specific (e.g. "morna", "fado", and the "music of X" seed items
-themselves), as opposed to a genre with no particular regional grounding (e.g. "rock music"). See
-[DESIGN.md#22-3_regional_classification](DESIGN.md#22-3_regional_classification) for why this step
+`4_regional_classification.parquet`: `3_regional_overview_classification.parquet` unchanged aside from two added
+columns flagging whether each row's `item_id` is a **regional genre** — nationally or ethnically
+specific (e.g. "morna", "fado", and the "music of X" seed items themselves), as opposed to a genre
+with no particular regional grounding (e.g. "rock music"). See
+[DESIGN.md#23-4_regional_classification](DESIGN.md#23-4_regional_classification) for why this step
 reads the extra Bronze/CSV inputs, its seeding/cascade rule, and open caveats.
 
 | Column          | Type | Meaning                                                                               |
@@ -250,19 +272,19 @@ reads the extra Bronze/CSV inputs, its seeding/cascade rule, and open caveats.
 | `regional_reason = "inherited"`           |          1,547 |
 
 Regenerate with `uv run --package wikidata python -m wikidata.silver.profile` (reads
-`SILVER_OUTPUT_DIR/3_regional_classification.parquet`, read-only, no new data fetched) — these
+`SILVER_OUTPUT_DIR/4_regional_classification.parquet`, read-only, no new data fetched) — these
 numbers will drift as Wikidata's live genre tree changes.
 
-### 3.5 4_canonical_parents
+### 3.6 5_canonical_parents
 
-`4_canonical_parents.parquet`: `3_regional_classification.parquet` unchanged, plus one column flagging
+`5_canonical_parents.parquet`: `4_regional_classification.parquet` unchanged, plus one column flagging
 whether each row's `parent_id` is itself an actual musical style. See
-[DESIGN.md#23-4_canonical_parents](DESIGN.md#23-4_canonical_parents) for the manual-CSV backstop this step
+[DESIGN.md#24-5_canonical_parents](DESIGN.md#24-5_canonical_parents) for the manual-CSV backstop this step
 applies before that flag is computed, and the classification rule.
 
 | Column          | Type  | Meaning                                                                                                                    |
 | --------------- | ----- | -------------------------------------------------------------------------------------------------------------------------- |
-| parent_is_canonical | bool? | Whether `parent_id` is `is_regional_overview = False` in `2_regional_overview_classification`; null for root rows (`parent_id` is null) |
+| parent_is_canonical | bool? | Whether `parent_id` is `is_regional_overview = False` in `3_regional_overview_classification`; null for root rows (`parent_id` is null) |
 
 **Data profile (as of this writing):**
 
@@ -274,20 +296,20 @@ applies before that flag is computed, and the classification rule.
 | `parent_is_canonical = null` (root, no parent) |   486 |
 
 Regenerate with `uv run --package wikidata python -m wikidata.silver.profile` (reads
-`SILVER_OUTPUT_DIR/4_canonical_parents.parquet`, read-only, no new data fetched) — these numbers will
+`SILVER_OUTPUT_DIR/5_canonical_parents.parquet`, read-only, no new data fetched) — these numbers will
 drift as Wikidata's live genre tree changes.
 
-### 3.6 5_canonical_hierarchy
+### 3.7 6_canonical_hierarchy
 
-`5_canonical_hierarchy.parquet` (canonical) and `5_regional_hierarchy.parquet` (regional): the first Silver
-step that actually prunes rather than flags. Reads `4_canonical_parents.parquet` and reduces it to one
+`6_canonical_hierarchy.parquet` (canonical) and `6_regional_hierarchy.parquet` (regional): the first Silver
+step that actually prunes rather than flags. Reads `5_canonical_parents.parquet` and reduces it to one
 row per genre item, split into two clean, directly-consumable genre hierarchy edge lists — a
 canonical one, excluding every `is_regional = true` item, and a regional one, containing only
 `is_regional = true` items (which now includes the `regional_overview` seed items themselves). See
-[DESIGN.md#24-5_canonical_hierarchy](DESIGN.md#24-5_canonical_hierarchy) for the two-stage
+[DESIGN.md#25-6_canonical_hierarchy](DESIGN.md#25-6_canonical_hierarchy) for the two-stage
 pruning/collapse rule and the open "too many roots" exploration (the manual-CSV backstops that drop
-non-genre items entirely run earlier, in `3_regional_classification` — see
-[DESIGN.md#224-manual-csv-backstops-for-non-genre-pruning](DESIGN.md#224-manual-csv-backstops-for-non-genre-pruning)).
+non-genre items entirely run earlier, in `2_non_genre_pruning` — see
+[DESIGN.md#21-2_non_genre_pruning](DESIGN.md#21-2_non_genre_pruning)).
 
 | Column        | Type | Meaning                                                                          |
 | ------------- | ---- | ---------------------------------------------------------------------------------- |
@@ -301,7 +323,7 @@ non-genre items entirely run earlier, in `3_regional_classification` — see
 
 **Data profile (as of this writing):**
 
-| Metric                                    | Canonical (`5_canonical_hierarchy`) | Regional (`5_regional_hierarchy`) |
+| Metric                                    | Canonical (`6_canonical_hierarchy`) | Regional (`6_regional_hierarchy`) |
 | ----------------------------------------- | ------------------------: | --------------------------------: |
 | Genre items in scope (distinct `item_id`) |                     1,016 |                             5,328 |
 | Final rows (= distinct `item_id`s)        |                       805 |                             5,328 |
@@ -309,22 +331,22 @@ non-genre items entirely run earlier, in `3_regional_classification` — see
 
 Genre items with zero surviving rows in _either_ output (the canonical-style silent vanish): **211**
 — all non-regional, i.e. every one is an "opera"-shaped item, not a regional one. See
-[DESIGN.md#24-5_canonical_hierarchy](DESIGN.md#24-5_canonical_hierarchy) for why the two outputs diverge here.
+[DESIGN.md#25-6_canonical_hierarchy](DESIGN.md#25-6_canonical_hierarchy) for why the two outputs diverge here.
 
 Regenerate with `uv run --package wikidata python -m wikidata.silver.profile` (reads
-`SILVER_OUTPUT_DIR/4_canonical_parents.parquet`, `SILVER_OUTPUT_DIR/5_canonical_hierarchy.parquet`, and
-`SILVER_OUTPUT_DIR/5_regional_hierarchy.parquet`, read-only, no new data fetched) — these numbers
+`SILVER_OUTPUT_DIR/5_canonical_parents.parquet`, `SILVER_OUTPUT_DIR/6_canonical_hierarchy.parquet`, and
+`SILVER_OUTPUT_DIR/6_regional_hierarchy.parquet`, read-only, no new data fetched) — these numbers
 will drift as Wikidata's live genre tree changes.
 
-### 3.7 6_canonical_roots
+### 3.8 7_canonical_roots
 
-`6_canonical_roots.parquet`: `5_canonical_hierarchy.parquet` filtered to rows where `parent_id` is null
+`7_canonical_roots.parquet`: `6_canonical_hierarchy.parquet` filtered to rows where `parent_id` is null
 (root items) and reduced to the three item-identifying columns, sorted by `item_label`. Exists
 purely to make manual exploration of the "too many roots" open question
-([DESIGN.md#24-5_canonical_hierarchy](DESIGN.md#24-5_canonical_hierarchy)) easier — a ready-to-open list of exactly the
+([DESIGN.md#25-6_canonical_hierarchy](DESIGN.md#25-6_canonical_hierarchy)) easier — a ready-to-open list of exactly the
 items in question, instead of re-deriving the filter each time (as
 `notebooks/explore_genre_tree.ipynb` currently does inline). Not consumed by any later step and not
-itself part of the pruning chain — it's a read view of `5_canonical_hierarchy`, not new information.
+itself part of the pruning chain — it's a read view of `6_canonical_hierarchy`, not new information.
 
 | Column     | Type | Meaning                                       |
 | ---------- | ---- | ---------------------------------------------- |
@@ -333,6 +355,6 @@ itself part of the pruning chain — it's a read view of `5_canonical_hierarchy`
 | item_url   | str  | `https://www.wikidata.org/wiki/` + `item_id`   |
 
 **Data profile (as of this writing):** 297 rows — see
-[DESIGN.md#24-5_canonical_hierarchy](DESIGN.md#24-5_canonical_hierarchy)'s "Under exploration" callout for context on
+[DESIGN.md#25-6_canonical_hierarchy](DESIGN.md#25-6_canonical_hierarchy)'s "Under exploration" callout for context on
 why this count is expected to shrink as the multi-parent collapse heuristic and regional
 classification rules mature.

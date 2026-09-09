@@ -7,13 +7,13 @@ from wikidata.silver.canonical_parents import MANUAL_CANONICAL_PARENTS_PATH, fla
 from wikidata.silver.canonical_roots import extract_canonical_roots
 from wikidata.silver.hierarchy import prune_genre_hierarchy
 from wikidata.silver.item_links import add_item_links
-from wikidata.silver.regional_classification import (
+from wikidata.silver.non_genre_pruning import (
     MANUAL_OUT_OF_SCOPE_GENRES_PATH,
-    MANUAL_OVERRIDES_PATH,
     MANUAL_TECHNIQUE_GENRES_PATH,
     MANUAL_THEME_GENRES_PATH,
-    classify_regional_genres,
+    prune_non_genre_items,
 )
+from wikidata.silver.regional_classification import MANUAL_OVERRIDES_PATH, classify_regional_genres
 from wikidata.silver.regional_overview_classification import (
     MANUAL_OVERVIEW_ADDITIONS_PATH,
     MANUAL_OVERVIEW_RECLASSIFICATIONS_PATH,
@@ -25,16 +25,20 @@ load_pipeline_env(wikidata.__file__)
 bronze_dir = resolve_pipeline_path(wikidata.__file__, require_env("BRONZE_OUTPUT_DIR"))
 silver_dir = resolve_pipeline_path(wikidata.__file__, require_env("SILVER_OUTPUT_DIR"))
 item_links_path = add_item_links(bronze_dir / "wikidata_genre_tree.parquet", silver_dir)
+non_genre_pruning_path = prune_non_genre_items(
+    item_links_path,
+    MANUAL_THEME_GENRES_PATH,
+    MANUAL_TECHNIQUE_GENRES_PATH,
+    MANUAL_OUT_OF_SCOPE_GENRES_PATH,
+    silver_dir,
+)
 regional_overview_classification_path = classify_regional_from_overviews(
-    item_links_path, MANUAL_OVERVIEW_ADDITIONS_PATH, MANUAL_OVERVIEW_RECLASSIFICATIONS_PATH, silver_dir
+    non_genre_pruning_path, MANUAL_OVERVIEW_ADDITIONS_PATH, MANUAL_OVERVIEW_RECLASSIFICATIONS_PATH, silver_dir
 )
 regional_classification_path = classify_regional_genres(
     regional_overview_classification_path,
     bronze_dir / "wikidata_genre_indigenous_to.parquet",
     MANUAL_OVERRIDES_PATH,
-    MANUAL_THEME_GENRES_PATH,
-    MANUAL_TECHNIQUE_GENRES_PATH,
-    MANUAL_OUT_OF_SCOPE_GENRES_PATH,
     silver_dir,
 )
 canonical_parents_path = flag_canonical_parents(regional_classification_path, MANUAL_CANONICAL_PARENTS_PATH, silver_dir)

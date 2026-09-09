@@ -24,13 +24,14 @@ Wikidata's music genre taxonomy (`P279` "subclass of" and `P361` "part of", root
 - **Source:** the public Wikidata SPARQL endpoint (`https://query.wikidata.org/sparql`), queried live — no local dump or database.
 - **Root query:** every Wikidata item classified `P31` ("instance of") `Q188451` ("music genre") — not a `P279` transitive walk from `Q188451`, which finds only ~14 meta-category items and misses nearly every real genre (see [DESIGN.md#1-bronze](DESIGN.md#1-bronze) for why).
 - **Bronze:** each of those genre items, plus its direct `P279` ("subclass of") and `P361` ("part of") parent edge(s), written as-is.
-- **Silver:** six sequential steps refine Bronze into canonical and regional genre hierarchies:
+- **Silver:** seven sequential steps refine Bronze into canonical and regional genre hierarchies:
   1. `1_item_links` — derives a browsable Wikidata page URL (`item_url`/`parent_url`) from each row's `item_id`/`parent_id`.
-  2. `2_regional_overview_classification` — flags regional-overview articles, e.g. "music of Kenya".
-  3. `3_regional_classification` — cascades that flag down to nationally/ethnically-specific genres, e.g. "fado", "morna".
-  4. `4_canonical_parents` — flags whether each edge's parent is itself an actual musical style.
-  5. `5_canonical_hierarchy` — prunes to one row per genre, split into canonical (`5_canonical_hierarchy.parquet`) and regional (`5_regional_hierarchy.parquet`) outputs.
-  6. `6_canonical_roots` — extracts `5_canonical_hierarchy`'s root items (no parent) into their own file, for manual exploration.
+  2. `2_non_genre_pruning` — drops theme/technique/out-of-scope items via manual CSV backstops.
+  3. `3_regional_overview_classification` — flags regional-overview articles, e.g. "music of Kenya".
+  4. `4_regional_classification` — cascades that flag down to nationally/ethnically-specific genres, e.g. "fado", "morna".
+  5. `5_canonical_parents` — flags whether each edge's parent is itself an actual musical style.
+  6. `6_canonical_hierarchy` — prunes to one row per genre, split into canonical (`6_canonical_hierarchy.parquet`) and regional (`6_regional_hierarchy.parquet`) outputs.
+  7. `7_canonical_roots` — extracts `6_canonical_hierarchy`'s root items (no parent) into their own file, for manual exploration.
 
 See [Pipeline](#pipeline) for exact column names and [SCHEMA.md](SCHEMA.md#3-silver) for full detail.
 
@@ -51,7 +52,7 @@ The target shape is **two distinct trees**:
   The regional follows a **different logic**: one root per **cultural/geographic region**, with that region’s specific genres nested beneath it.
   _Example_: A root like "West Africa" could include sub-genres such as "Afrobeat," "Highlife," or "Mbalax."
 
-See [DESIGN.md#24-5_canonical_hierarchy](DESIGN.md#24-5_canonical_hierarchy)'s "Under exploration" callout.
+See [DESIGN.md#25-6_canonical_hierarchy](DESIGN.md#25-6_canonical_hierarchy)'s "Under exploration" callout.
 
 ## Pipeline
 
@@ -59,11 +60,12 @@ See [DESIGN.md#24-5_canonical_hierarchy](DESIGN.md#24-5_canonical_hierarchy)'s "
 | ------ | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Bronze | `ingest`                             | Wikidata's music genre tree (`P279`/`P361` edges), queried live via SPARQL and written as-is to Parquet via Polars                                                                                                                         |
 | Silver | `1_item_links`                       | Adds `item_url`/`parent_url`, a browsable Wikidata page derived from `item_id`/`parent_id`                                                                                                                                                  |
-| Silver | `2_regional_overview_classification` | Classifies Bronze edges with `is_regional_overview` and `classification_reason`, tagging items such as "music of Kenya" as regional_overview                                                                                              |
-| Silver | `3_regional_classification`          | Adds `is_regional`/`regional_reason`, cascading regional status (e.g. "morna", "fado") from `regional_overview` seeds, which are themselves marked `is_regional`/`seed`                                                                    |
-| Silver | `4_canonical_parents`                    | Adds `parent_is_canonical`, identifying edges whose parent isn't itself an actual musical style                                                                                                                                                 |
-| Silver | `5_canonical_hierarchy`                        | Prunes to two clean, one-parent-per-item edge lists — canonical (`5_canonical_hierarchy.parquet`) and regional (`5_regional_hierarchy.parquet`) — with a provisional lowest-QID heuristic for multi-parent items — see [DESIGN.md#24-5_canonical_hierarchy](DESIGN.md#24-5_canonical_hierarchy) |
-| Silver | `6_canonical_roots`                  | Filters `5_canonical_hierarchy.parquet` to root items (no parent), for manual exploration of the "too many roots" open question — see [DESIGN.md#24-5_canonical_hierarchy](DESIGN.md#24-5_canonical_hierarchy)                                                                                  |
+| Silver | `2_non_genre_pruning`                | Drops theme/technique/out-of-scope items entirely via manual CSV backstops — see [DESIGN.md#21-2_non_genre_pruning](DESIGN.md#21-2_non_genre_pruning) |
+| Silver | `3_regional_overview_classification` | Classifies Bronze edges with `is_regional_overview` and `classification_reason`, tagging items such as "music of Kenya" as regional_overview                                                                                              |
+| Silver | `4_regional_classification`          | Adds `is_regional`/`regional_reason`, cascading regional status (e.g. "morna", "fado") from `regional_overview` seeds, which are themselves marked `is_regional`/`seed`                                                                    |
+| Silver | `5_canonical_parents`                    | Adds `parent_is_canonical`, identifying edges whose parent isn't itself an actual musical style                                                                                                                                                 |
+| Silver | `6_canonical_hierarchy`                        | Prunes to two clean, one-parent-per-item edge lists — canonical (`6_canonical_hierarchy.parquet`) and regional (`6_regional_hierarchy.parquet`) — with a provisional lowest-QID heuristic for multi-parent items — see [DESIGN.md#25-6_canonical_hierarchy](DESIGN.md#25-6_canonical_hierarchy) |
+| Silver | `7_canonical_roots`                  | Filters `6_canonical_hierarchy.parquet` to root items (no parent), for manual exploration of the "too many roots" open question — see [DESIGN.md#25-6_canonical_hierarchy](DESIGN.md#25-6_canonical_hierarchy)                                                                                  |
 
 ## Schema
 
@@ -86,20 +88,22 @@ writes `wikidata_genre_tree.parquet` (git-ignored) to `BRONZE_OUTPUT_DIR`. Then:
 uv run --package wikidata python -m wikidata.silver
 ```
 
-reads that file and writes `1_item_links.parquet`, `2_regional_overview_classification.parquet`,
-`3_regional_classification.parquet`, `4_canonical_parents.parquet`, `5_canonical_hierarchy.parquet`, `5_regional_hierarchy.parquet`,
-and `6_canonical_roots.parquet` (git-ignored) to `SILVER_OUTPUT_DIR`. Query any of them directly with
+reads that file and writes `1_item_links.parquet`, `2_non_genre_pruning.parquet`,
+`3_regional_overview_classification.parquet`, `4_regional_classification.parquet`, `5_canonical_parents.parquet`,
+`6_canonical_hierarchy.parquet`, `6_regional_hierarchy.parquet`, and `7_canonical_roots.parquet`
+(git-ignored) to `SILVER_OUTPUT_DIR`. Query any of them directly with
 [DuckDB](https://duckdb.org/), no import step needed:
 
 ```bash
 duckdb -c "SELECT * FROM '<BRONZE_OUTPUT_DIR>/wikidata_genre_tree.parquet' LIMIT 10"
 duckdb -c "SELECT * FROM '<SILVER_OUTPUT_DIR>/1_item_links.parquet' LIMIT 10"
-duckdb -c "SELECT * FROM '<SILVER_OUTPUT_DIR>/2_regional_overview_classification.parquet' WHERE is_regional_overview LIMIT 10"
-duckdb -c "SELECT * FROM '<SILVER_OUTPUT_DIR>/3_regional_classification.parquet' WHERE is_regional LIMIT 10"
-duckdb -c "SELECT * FROM '<SILVER_OUTPUT_DIR>/4_canonical_parents.parquet' WHERE parent_is_canonical LIMIT 10"
-duckdb -c "SELECT * FROM '<SILVER_OUTPUT_DIR>/5_canonical_hierarchy.parquet' LIMIT 10"
-duckdb -c "SELECT * FROM '<SILVER_OUTPUT_DIR>/5_regional_hierarchy.parquet' LIMIT 10"
-duckdb -c "SELECT * FROM '<SILVER_OUTPUT_DIR>/6_canonical_roots.parquet' LIMIT 10"
+duckdb -c "SELECT * FROM '<SILVER_OUTPUT_DIR>/2_non_genre_pruning.parquet' LIMIT 10"
+duckdb -c "SELECT * FROM '<SILVER_OUTPUT_DIR>/3_regional_overview_classification.parquet' WHERE is_regional_overview LIMIT 10"
+duckdb -c "SELECT * FROM '<SILVER_OUTPUT_DIR>/4_regional_classification.parquet' WHERE is_regional LIMIT 10"
+duckdb -c "SELECT * FROM '<SILVER_OUTPUT_DIR>/5_canonical_parents.parquet' WHERE parent_is_canonical LIMIT 10"
+duckdb -c "SELECT * FROM '<SILVER_OUTPUT_DIR>/6_canonical_hierarchy.parquet' LIMIT 10"
+duckdb -c "SELECT * FROM '<SILVER_OUTPUT_DIR>/6_regional_hierarchy.parquet' LIMIT 10"
+duckdb -c "SELECT * FROM '<SILVER_OUTPUT_DIR>/7_canonical_roots.parquet' LIMIT 10"
 ```
 
 For row/item counts and the `classification_reason`/`is_regional`/`parent_is_canonical` breakdowns (see [SCHEMA.md#3-silver](SCHEMA.md#3-silver)):
