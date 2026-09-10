@@ -1,2 +1,2 @@
 item_id,item_label,reason
-LOCAL:reggae-dub,Reggae/Dub,"synthetic canonical grouping node (no single Wikidata item spans both reggae and dub music); reggae itself has a genuine P279 edge to ""music of Jamaica"" so is otherwise automatically is_regional, see manual_main_parent.csv exclude_other_parents"
+LOCAL:ska-reggae-dub,Ska/Reggae/Dub,"synthetic canonical grouping node (no single Wikidata item spans ska, reggae, and dub); reggae itself has a genuine P279 edge to ""music of Jamaica"" so is otherwise automatically is_regional, see manual_main_parent.csv exclude_other_parents; ska added per user request (chronologically first, sharing the same offbeat ""skank"" rhythmic tradition)"
