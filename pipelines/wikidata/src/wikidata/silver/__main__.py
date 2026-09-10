@@ -15,6 +15,7 @@ from wikidata.silver.non_genre_pruning import (
     prune_non_genre_items,
 )
 from wikidata.silver.regional_classification import (
+    MANUAL_CANONICAL_PARENT_ADDITIONS_PATH,
     MANUAL_MAIN_PARENT_PATH,
     MANUAL_OVERRIDES_PATH,
     classify_regional_genres,
@@ -45,6 +46,7 @@ regional_classification_path = classify_regional_genres(
     regional_overview_classification_path,
     bronze_dir / "wikidata_genre_indigenous_to.parquet",
     MANUAL_OVERRIDES_PATH,
+    MANUAL_CANONICAL_PARENT_ADDITIONS_PATH,
     MANUAL_MAIN_PARENT_PATH,
     silver_dir,
 )

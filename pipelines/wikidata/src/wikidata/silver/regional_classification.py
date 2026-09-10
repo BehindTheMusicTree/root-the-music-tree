@@ -32,11 +32,85 @@ MANUAL_OVERRIDES_PATH = Path(__file__).parent / "manual_regional_overrides.csv"
 # check the parent's flavor by hand. `parent_item_id` must reference another genre item already in
 # the tree; it must not be `is_regional_overview` (that's what manual_regional_overrides.csv, with
 # its overview_item_id column, is for). See DESIGN.md#24-5_canonical_parents.
+#
+# An optional `exclude_other_parents` column (blank/"false" by default) drops an item's *other*
+# candidate parent edges entirely, rather than just supplying an extra one — needed when an item has
+# a genuine conflicting edge into the regional seed set (e.g. "reggae" -> "music of Jamaica" via
+# P279) that would otherwise keep it `is_regional=True` via the cascade below regardless of the
+# manual override, since is_regional is computed from *any* of an item's parent edges, not just its
+# eventual main parent.
 MANUAL_MAIN_PARENT_PATH = Path(__file__).parent / "manual_main_parent.csv"
 
 # Tags a synthetic edge injected from manual_main_parent.csv so main_parent_selection.py can prefer
 # it over the item's other candidate parent edges when picking a main parent.
 MANUAL_MAIN_PARENT_RELATION_TYPE = "manual_main_parent"
+
+# Committed alongside the code for the same reason as the paths above: a canonical (non-regional,
+# non-overview) grouping node that has no real Wikidata QID of its own — e.g. "Reggae/Dub", a
+# grouping Gold-layer wants but that no single Wikidata item represents — so a data expert can still
+# give real genre items (like "reggae" and "dub music") a real parent to nest under in
+# manual_main_parent.csv. `item_id` must be a synthetic `LOCAL:`-prefixed id (never a fabricated
+# QID-shaped id) and must not already be present in the genre tree. Applied before
+# _apply_manual_main_parent so the new node is a legal parent_item_id target. See
+# DESIGN.md#23-4_regional_classification.
+MANUAL_CANONICAL_PARENT_ADDITIONS_PATH = Path(__file__).parent / "manual_canonical_parent_additions.csv"
+MANUAL_CANONICAL_PARENT_ADDITION_REASON = "manual_canonical_parent_addition"
+LOCAL_ID_PREFIX = "LOCAL:"
+
+
+def _add_manual_canonical_parent_items(df: pl.DataFrame, manual_additions: pl.DataFrame) -> pl.DataFrame:
+    if manual_additions.is_empty():
+        return df
+
+    blank = manual_additions.filter(
+        pl.col("item_id").is_null()
+        | (pl.col("item_id").str.strip_chars() == "")
+        | pl.col("item_label").is_null()
+        | (pl.col("item_label").str.strip_chars() == "")
+    )
+    if not blank.is_empty():
+        raise ValueError(
+            "manual_canonical_parent_additions.csv rows must not have a blank item_id or item_label: "
+            f"{blank.select('item_id').to_series().to_list()}"
+        )
+
+    manual_additions = manual_additions.with_columns(
+        item_id=pl.col("item_id").str.strip_chars(), item_label=pl.col("item_label").str.strip_chars()
+    )
+
+    non_local = manual_additions.filter(~pl.col("item_id").str.starts_with(LOCAL_ID_PREFIX))
+    if not non_local.is_empty():
+        raise ValueError(
+            f"manual_canonical_parent_additions.csv rows must have an item_id starting with '{LOCAL_ID_PREFIX}' "
+            f"(never a fabricated QID-shaped id): {non_local.select('item_id').to_series().to_list()}"
+        )
+
+    added_ids = manual_additions.select("item_id").to_series().to_list()
+    if len(added_ids) != len(set(added_ids)):
+        raise ValueError("manual_canonical_parent_additions.csv contains duplicate item_id rows")
+
+    known_item_ids = set(df.select("item_id").unique().to_series())
+    already_present = [item_id for item_id in added_ids if item_id in known_item_ids]
+    if already_present:
+        raise ValueError(
+            "manual_canonical_parent_additions.csv rows already present in the genre tree "
+            f"(remove them, they don't need manual addition): {already_present}"
+        )
+
+    added = manual_additions.with_columns(
+        parent_id=pl.lit(None, dtype=pl.Utf8),
+        parent_label=pl.lit(None, dtype=pl.Utf8),
+        relation_type=pl.lit(None, dtype=pl.Utf8),
+        item_url=pl.lit(WIKIDATA_ITEM_URL_PREFIX) + pl.col("item_id"),
+        parent_url=pl.lit(None, dtype=pl.Utf8),
+        has_item_label=pl.lit(True),
+        has_parent_label=pl.lit(None, dtype=pl.Boolean),
+        is_regional_overview=pl.lit(False),
+        classification_reason=pl.lit(MANUAL_CANONICAL_PARENT_ADDITION_REASON),
+    ).select(df.columns)
+    logger.info("added %d manual synthetic canonical parent node(s)", added.height)
+
+    return pl.concat([df, added])
 
 
 def _apply_manual_main_parent(df: pl.DataFrame, manual_parents: pl.DataFrame) -> pl.DataFrame:
@@ -104,6 +178,18 @@ def _apply_manual_main_parent(df: pl.DataFrame, manual_parents: pl.DataFrame) ->
             f"tree — this backstop is not for overview items: {non_canonical_item_ids}"
         )
 
+    if "exclude_other_parents" in overrides.columns:
+        exclude_ids = set(
+            overrides.filter(
+                pl.col("exclude_other_parents").cast(pl.Utf8).str.strip_chars().str.to_lowercase() == "true"
+            )
+            .select("item_id")
+            .unique()
+            .to_series()
+        )
+    else:
+        exclude_ids = set()
+
     parent_labels = (
         df.select("item_id", "item_label")
         .unique(subset="item_id")
@@ -128,7 +214,12 @@ def _apply_manual_main_parent(df: pl.DataFrame, manual_parents: pl.DataFrame) ->
         )
     synthetic_edges = synthetic_edges.select(df.columns)
 
-    df = df.filter(~(pl.col("item_id").is_in(list(overridden_ids)) & pl.col("parent_id").is_null()))
+    df = df.filter(
+        ~(
+            pl.col("item_id").is_in(list(overridden_ids))
+            & (pl.col("parent_id").is_null() | pl.col("item_id").is_in(list(exclude_ids)))
+        )
+    )
     return pl.concat([df, synthetic_edges])
 
 
@@ -207,6 +298,7 @@ def classify_regional_genres(
     regional_overview_classification_path: Path,
     indigenous_to_path: Path,
     manual_overrides_path: Path,
+    manual_canonical_parent_additions_path: Path,
     manual_main_parent_path: Path,
     output_dir: Path,
 ) -> Path:
@@ -217,6 +309,10 @@ def classify_regional_genres(
     manual_overrides = pl.read_csv(manual_overrides_path)
     manual_override_ids = set(manual_overrides.select("item_id").unique().to_series())
     df = _apply_overview_overrides(df, manual_overrides)
+    manual_canonical_additions_schema = {"item_id": pl.Utf8, "item_label": pl.Utf8, "reason": pl.Utf8}
+    df = _add_manual_canonical_parent_items(
+        df, pl.read_csv(manual_canonical_parent_additions_path, schema_overrides=manual_canonical_additions_schema)
+    )
     manual_main_parent = pl.read_csv(manual_main_parent_path)
     df = _apply_manual_main_parent(df, manual_main_parent)
 

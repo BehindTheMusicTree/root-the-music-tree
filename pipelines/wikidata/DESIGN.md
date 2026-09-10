@@ -361,6 +361,26 @@ isn't a known item in the tree, if `item_id` has more than one row in the CSV, o
 or `item_id` itself is flagged `is_regional_overview` (that's what `manual_regional_overrides.csv`
 is for).
 
+An optional `exclude_other_parents` column (`"true"`/blank, default blank = keep other edges) drops
+an item's *other* candidate parent edges entirely, instead of just adding one alongside them. This
+matters because `is_regional` is computed from *any* of an item's parent edges
+([2.3.3](#233-cascade)), not just its eventual main parent — an item with a genuine conflicting edge
+into the regional seed set (e.g. "reggae" → "music of Jamaica" via a real `P279` edge) would stay
+`is_regional = True` via that edge regardless of a `manual_main_parent.csv` override, unless that
+edge is excluded too. Used sparingly: it's a real behavior change (secondary parents are normally
+kept, see [2.4.2](#242-secondary-parents-are-kept-not-dropped)), reserved for cases where an item
+needs to leave the regional graph entirely, not just get a better main parent.
+
+`manual_main_parent.csv`'s `parent_item_id` is usually a real Wikidata item already in the tree, but
+can also be a synthetic grouping node with no Wikidata counterpart (e.g. "Reggae/Dub", grouping
+"reggae" and "dub music" — no single Wikidata item represents that pairing). Such nodes are added via
+a third git-tracked, hand-curated CSV, `manual_canonical_parent_additions.csv` (columns: `item_id`,
+`item_label`, `reason`), applied just before `manual_main_parent.csv` so the new node is a legal
+`parent_item_id` target. `item_id` must start with `LOCAL:` (never a fabricated QID-shaped id) and
+must not already exist in the tree — the mirror image of the synthetic-id fallback in
+`manual_regional_overview_additions.csv` ([2.2](#22-3_regional_overview_classification)), but for
+the canonical side instead of the regional-overview side.
+
 ### 2.4 5_main_parent_selection
 
 #### 2.4.1 Rule: manual override, else lowest-QID heuristic
