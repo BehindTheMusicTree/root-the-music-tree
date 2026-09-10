@@ -89,7 +89,7 @@ Q212688,dub music,"user-requested regrouping under a synthetic canonical ""Ska/R
 Q54365,ska,"user-requested regrouping under the renamed synthetic ""Ska/Reggae/Dub"" node; shares the same offbeat ""skank"" rhythmic tradition, though musically distinct in tempo/instrumentation",LOCAL:ska-reggae-dub,
 Q1113204,dub poetry,"root item with no P279/P361 parent surviving to Silver; Wikidata itself lists roots reggae as an existing parent (spoken-word poetry performed over dub/reggae rhythms), so it belongs under its real genre parent rather than being treated as regional-only",Q1299260,
 Q58339,disco,"user-requested regrouping under a synthetic canonical ""Disco/Funk"" node alongside funk; disco has a genuine P361 edge to ""African-American music"" that would otherwise keep it is_regional via the cascade regardless of this override, so its other parent edges are excluded too",LOCAL:disco-funk,true
-Q164444,funk,"user-requested regrouping under a synthetic canonical ""Disco/Funk"" node alongside disco; no longer a standalone canonical root",LOCAL:disco-funk,
+Q164444,funk,"user-requested regrouping under a synthetic canonical """"Core funk"""" node alongside disco/pop funk; no longer a standalone canonical root",LOCAL:core-funk,
 Q9759,blues,"user-requested regrouping under a synthetic canonical ""Blues/Rock"" node alongside rock; blues has a genuine P279 edge to ""music of North America"" that would otherwise keep it is_regional via the cascade regardless of this override, so its other parent edges are excluded too",LOCAL:core-blues-rock,true
 Q11399,rock music,"user-requested regrouping under a synthetic canonical ""Blues/Rock"" node alongside blues; no longer a standalone canonical root",LOCAL:core-blues-rock,
 LOCAL:pop-electronic,Pop electronic,user-requested new intermediate node under electronic music,Q9778,
@@ -234,3 +234,10 @@ Q127606451,street pop,user-requested regrouping under hip-hop subgroup LOCAL:pop
 Q106634977,thug rap,user-requested regrouping under hip-hop subgroup LOCAL:core-hip-hop,LOCAL:core-hip-hop,
 Q2913982,trap music,user-requested regrouping under hip-hop subgroup LOCAL:pop-hip-hop,LOCAL:pop-hip-hop,
 Q1046801,turntablism,user-requested regrouping under hip-hop subgroup LOCAL:core-hip-hop,LOCAL:core-hip-hop,
+LOCAL:pop-funk,Pop funk,user-requested new intermediate node under LOCAL:disco-funk,LOCAL:disco-funk,
+LOCAL:core-funk,Core funk,user-requested new intermediate node under LOCAL:disco-funk,LOCAL:disco-funk,
+Q1325963,electro funk,"user-requested reparent under LOCAL:pop-funk, moved out from under funk",LOCAL:pop-funk,
+Q2697917,go-go,"user-requested reparent under LOCAL:pop-funk, moved out from under funk",LOCAL:pop-funk,
+Q7067688,nu-funk,"user-requested reparent under LOCAL:pop-funk, moved out from under funk",LOCAL:pop-funk,
+Q3925627,punk funk,"user-requested reparent under LOCAL:pop-funk, moved out from under funk",LOCAL:pop-funk,
+Q30632022,synth funk,"user-requested reparent under LOCAL:pop-funk, moved out from under funk",LOCAL:pop-funk,
