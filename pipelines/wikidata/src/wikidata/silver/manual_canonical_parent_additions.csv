@@ -4,3 +4,4 @@ LOCAL:disco-funk,Disco/Funk,"synthetic canonical grouping node (no single Wikida
 LOCAL:blues-rock,Blues/Rock,"synthetic canonical grouping node (no single Wikidata item spans both blues and rock); blues has a genuine P279 edge to ""music of North America"" so is otherwise automatically is_regional (direct), see manual_main_parent.csv exclude_other_parents; user-requested regrouping"
 LOCAL:pop-electronic,Pop electronic,synthetic canonical grouping node for electronic music (Q9778) subgenres with pop/dance/rock crossover appeal; user-requested regrouping
 LOCAL:core-electronic,Core electronic,synthetic canonical grouping node for electronic music (Q9778) subgenres not routed to Pop electronic; user-requested regrouping
+LOCAL:core-blues-rock,Core Blues/Rock,"synthetic canonical grouping node under LOCAL:blues-rock for the original blues/rock genres, sibling to pop rock (Q484641); user-requested regrouping"
