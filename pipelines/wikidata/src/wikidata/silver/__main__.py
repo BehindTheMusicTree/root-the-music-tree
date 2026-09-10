@@ -5,7 +5,7 @@ from common.env import load_pipeline_env, require_env, resolve_pipeline_path
 import wikidata
 from wikidata.silver.canonical_hierarchy import prune_canonical_hierarchy
 from wikidata.silver.canonical_parents import flag_canonical_parents
-from wikidata.silver.canonical_roots import extract_canonical_roots
+from wikidata.silver.canonical_roots import MANUAL_ACCEPTED_ROOTS_PATH, extract_canonical_roots
 from wikidata.silver.item_links import add_item_links
 from wikidata.silver.main_parent_selection import select_main_parents
 from wikidata.silver.non_genre_pruning import (
@@ -54,4 +54,4 @@ main_parent_selection_path, _secondary_parents_path = select_main_parents(region
 canonical_parents_path = flag_canonical_parents(main_parent_selection_path, silver_dir)
 canonical_hierarchy_path = prune_canonical_hierarchy(canonical_parents_path, silver_dir)
 prune_regional_hierarchy(canonical_parents_path, silver_dir)
-extract_canonical_roots(canonical_hierarchy_path, silver_dir)
+extract_canonical_roots(canonical_hierarchy_path, MANUAL_ACCEPTED_ROOTS_PATH, silver_dir)

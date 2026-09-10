@@ -510,3 +510,22 @@ A `regional_overview` seed like "music of Cape Verde" is now a real node with it
 chain (or a genuine root, if it has no `P279`/`P361` parent at all) rather than being dropped — so
 an item like "morna," whose only parent is that seed, keeps its real parent edge instead of being
 promoted to a synthetic root itself.
+
+### 2.8 9_canonical_roots
+
+`9_canonical_roots.parquet` extracts `7_canonical_hierarchy`'s root items (`parent_id` null, or
+pointing at an item with no row of its own) for manual triage — see
+`.claude/skills/wikidata-canonical-roots/SKILL.md`.
+
+#### 2.8.1 `manual_accepted_roots.csv` guard-rail
+
+A root that isn't already in the git-tracked `manual_accepted_roots.csv` is new since the last
+triage pass and raises, rather than silently reappearing in the output — a curator must give it a
+real parent (`manual_main_parent.csv`), flag it as theme/technique/out-of-scope (§2.1), or add it
+to `manual_accepted_roots.csv` once confirmed genuinely standalone.
+
+This is deliberately diff-based rather than a blanket check: dropping a broad umbrella item (e.g.
+"popular music") as theme/technique/out-of-scope legitimately orphans many real subgenres into
+roots (rock, jazz, pop, ska, …) — that's the intended effect of the drop, not a bug. A check that
+raised on any orphaned child, rather than only on ones absent from the previously-accepted set,
+would fire on that entire pre-existing backlog every run.

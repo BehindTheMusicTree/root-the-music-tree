@@ -5,8 +5,15 @@ import polars as pl
 
 logger = logging.getLogger(__name__)
 
+# Committed alongside the code (not a gitignored silver output): the set of roots a data expert has
+# already triaged and accepted as genuinely standalone canonical genres (see
+# .claude/skills/wikidata-canonical-roots/SKILL.md). A root that isn't in this list is new since the
+# last triage pass and must be reviewed — either given a real parent (manual_main_parent.csv),
+# flagged as theme/technique/out-of-scope, or added here once confirmed standalone.
+MANUAL_ACCEPTED_ROOTS_PATH = Path(__file__).parent / "manual_accepted_roots.csv"
 
-def extract_canonical_roots(hierarchy_path: Path, output_dir: Path) -> Path:
+
+def extract_canonical_roots(hierarchy_path: Path, manual_accepted_roots_path: Path, output_dir: Path) -> Path:
     logger.info("extracting canonical roots from %s", hierarchy_path)
     df = pl.read_parquet(hierarchy_path)
 
@@ -17,6 +24,16 @@ def extract_canonical_roots(hierarchy_path: Path, output_dir: Path) -> Path:
     known_item_ids = df.select("item_id").unique().to_series().to_list()
     is_root = pl.col("parent_id").is_null() | ~pl.col("parent_id").is_in(known_item_ids)
     roots = df.filter(is_root).select("item_id", "item_label", "item_url").sort("item_label")
+
+    accepted_ids = set(pl.read_csv(manual_accepted_roots_path).select("item_id").to_series())
+    new_roots = roots.filter(~pl.col("item_id").is_in(accepted_ids))
+    if not new_roots.is_empty():
+        rows = [f"{r['item_id']} ({r['item_label']})" for r in new_roots.iter_rows(named=True)]
+        raise ValueError(
+            "new canonical root(s) not in manual_accepted_roots.csv, needs triage per "
+            f"wikidata-canonical-roots (give it a real parent, flag it as theme/technique/out-of-scope, "
+            f"or add it to manual_accepted_roots.csv once confirmed standalone): {rows}"
+        )
 
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / "9_canonical_roots.parquet"
