@@ -57,6 +57,20 @@ MANUAL_CANONICAL_PARENT_ADDITIONS_PATH = Path(__file__).parent / "manual_canonic
 MANUAL_CANONICAL_PARENT_ADDITION_REASON = "manual_canonical_parent_addition"
 LOCAL_ID_PREFIX = "LOCAL:"
 
+# Committed alongside the code for the same reason as the paths above: P2341 ("indigenous to") is
+# treated as an automatic regional-seed signal below, but — like P495 ("country of origin", see the
+# comment in classify_regional_genres for why that property is excluded entirely) — it's sometimes
+# set on a broad canonical umbrella genre pointing at a whole continent rather than a specific
+# people (e.g. "classical music" -> Europe), which would wrongly pull it into the regional tree as
+# an orphan root instead of nesting it under its real canonical parent. Unlike P495 this can't be
+# blanket-excluded (P2341 correctly identifies real regional genres like "Han Chinese music" that
+# have no other regional signal at all), so this file lets a data expert exclude specific
+# false-positive item_ids from the indigenous_to seed source only, one at a time. CSV columns:
+# item_id,item_label,reason. `item_id` must already carry a P2341 value in Bronze
+# wikidata_genre_indigenous_to.parquet — the pipeline raises otherwise, since an exclusion with
+# nothing to exclude is almost certainly a stale/typo'd entry.
+MANUAL_INDIGENOUS_TO_EXCLUSIONS_PATH = Path(__file__).parent / "manual_indigenous_to_exclusions.csv"
+
 
 def _add_manual_canonical_parent_items(df: pl.DataFrame, manual_additions: pl.DataFrame) -> pl.DataFrame:
     if manual_additions.is_empty():
@@ -265,6 +279,18 @@ def _apply_overview_overrides(df: pl.DataFrame, manual_overrides: pl.DataFrame) 
             f"in the genre tree: {non_regional_overview_ids}"
         )
 
+    if "exclude_other_parents" in overrides.columns:
+        exclude_ids = set(
+            overrides.filter(
+                pl.col("exclude_other_parents").cast(pl.Utf8).str.strip_chars().str.to_lowercase() == "true"
+            )
+            .select("item_id")
+            .unique()
+            .to_series()
+        )
+    else:
+        exclude_ids = set()
+
     overview_labels = (
         df.select("item_id", "item_label")
         .unique(subset="item_id")
@@ -290,8 +316,27 @@ def _apply_overview_overrides(df: pl.DataFrame, manual_overrides: pl.DataFrame) 
     synthetic_edges = synthetic_edges.select(df.columns)
 
     overridden_ids = set(overrides.select("item_id").unique().to_series())
-    df = df.filter(~(pl.col("item_id").is_in(list(overridden_ids)) & pl.col("parent_id").is_null()))
+    df = df.filter(
+        ~(
+            pl.col("item_id").is_in(list(overridden_ids))
+            & (pl.col("parent_id").is_null() | pl.col("item_id").is_in(list(exclude_ids)))
+        )
+    )
     return pl.concat([df, synthetic_edges])
+
+
+def _apply_indigenous_to_exclusions(indigenous_ids: set[str], exclusions: pl.DataFrame) -> set[str]:
+    if exclusions.is_empty():
+        return indigenous_ids
+
+    exclusion_ids = set(exclusions.select("item_id").unique().to_series())
+    unknown_ids = sorted(exclusion_ids - indigenous_ids)
+    if unknown_ids:
+        raise ValueError(
+            "manual_indigenous_to_exclusions.csv rows reference item_id(s) with no P2341 value in "
+            f"wikidata_genre_indigenous_to.parquet: {unknown_ids}"
+        )
+    return indigenous_ids - exclusion_ids
 
 
 def classify_regional_genres(
@@ -300,12 +345,14 @@ def classify_regional_genres(
     manual_overrides_path: Path,
     manual_canonical_parent_additions_path: Path,
     manual_main_parent_path: Path,
+    manual_indigenous_to_exclusions_path: Path,
     output_dir: Path,
 ) -> Path:
     logger.info("classifying regional genres in %s", regional_overview_classification_path)
     df = pl.read_parquet(regional_overview_classification_path)
 
     indigenous_ids = set(pl.read_parquet(indigenous_to_path).select("item_id").unique().to_series())
+    indigenous_ids = _apply_indigenous_to_exclusions(indigenous_ids, pl.read_csv(manual_indigenous_to_exclusions_path))
     manual_overrides = pl.read_csv(manual_overrides_path)
     manual_override_ids = set(manual_overrides.select("item_id").unique().to_series())
     df = _apply_overview_overrides(df, manual_overrides)

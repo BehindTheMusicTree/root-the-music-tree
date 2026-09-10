@@ -194,6 +194,14 @@ def _write_manual_canonical_parent_additions(tmp_path: Path) -> Path:
     return manual_canonical_parent_additions_path
 
 
+def _write_manual_indigenous_to_exclusions(tmp_path: Path) -> Path:
+    manual_indigenous_to_exclusions_path = tmp_path / "manual_indigenous_to_exclusions.csv"
+    pl.DataFrame(schema={"item_id": pl.Utf8, "item_label": pl.Utf8, "reason": pl.Utf8}).write_csv(
+        manual_indigenous_to_exclusions_path
+    )
+    return manual_indigenous_to_exclusions_path
+
+
 def _classify_regional_genres(
     regional_overview_classification_path: Path,
     indigenous_to_path: Path,
@@ -201,6 +209,7 @@ def _classify_regional_genres(
     output_dir: Path,
     manual_main_parent_path: Path | None = None,
     manual_canonical_parent_additions_path: Path | None = None,
+    manual_indigenous_to_exclusions_path: Path | None = None,
     *,
     tmp_path: Path | None = None,
 ) -> Path:
@@ -211,6 +220,7 @@ def _classify_regional_genres(
         manual_overrides_path,
         manual_canonical_parent_additions_path or _write_manual_canonical_parent_additions(tmp_path),
         manual_main_parent_path or _write_manual_main_parent(tmp_path),
+        manual_indigenous_to_exclusions_path or _write_manual_indigenous_to_exclusions(tmp_path),
         output_dir,
     )
 
@@ -823,3 +833,122 @@ def test_classify_regional_genres_exclude_other_parents_false_keeps_other_edges(
     parent_ids = set(fado_rows.select("parent_id").to_series().to_list())
     assert parent_ids == {"Q106556293", "Q8341"}
     assert fado_rows.filter(pl.col("parent_id") == "Q106556293").row(0, named=True)["is_regional"]
+
+
+def test_classify_regional_genres_overview_override_exclude_other_parents_drops_conflicting_edge(
+    tmp_path: Path,
+) -> None:
+    # jazz has a genuine parent edge into popular music (canonical). Overriding jazz's main parent to
+    # music of Portugal with exclude_other_parents=true must drop that other edge too, not just a
+    # null-parent placeholder — otherwise main_parent_selection's lowest-QID fallback could still pick
+    # the surviving popular-music edge over the override.
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
+    indigenous_to_path = _write_indigenous_to(tmp_path)
+    manual_overrides_path = tmp_path / "manual_regional_overrides.csv"
+    pl.DataFrame(
+        {
+            "item_id": ["Q8341"],  # jazz, already has a parent edge to popular music
+            "item_label": ["jazz"],
+            "reason": ["test"],
+            "overview_item_id": ["Q2579987"],  # music of Portugal
+            "exclude_other_parents": ["true"],
+        }
+    ).write_csv(manual_overrides_path)
+    output_dir = tmp_path / "silver"
+
+    result = _classify_regional_genres(
+        regional_overview_classification_path, indigenous_to_path, manual_overrides_path, output_dir
+    )
+
+    df = pl.read_parquet(result)
+    jazz_rows = df.filter(pl.col("item_id") == "Q8341")
+    parent_ids = set(jazz_rows.select("parent_id").to_series().to_list())
+    assert parent_ids == {"Q2579987"}
+    override_row = jazz_rows.row(0, named=True)
+    assert override_row["relation_type"] == "manual_override_parent"
+    assert override_row["is_regional"]
+
+
+def test_classify_regional_genres_overview_override_exclude_other_parents_false_keeps_other_edges(
+    tmp_path: Path,
+) -> None:
+    # Same override as above but exclude_other_parents left blank/false: the other parent edge into
+    # popular music must survive alongside the synthetic override edge.
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
+    indigenous_to_path = _write_indigenous_to(tmp_path)
+    manual_overrides_path = tmp_path / "manual_regional_overrides.csv"
+    pl.DataFrame(
+        {
+            "item_id": ["Q8341"],
+            "item_label": ["jazz"],
+            "reason": ["test"],
+            "overview_item_id": ["Q2579987"],
+            "exclude_other_parents": [""],
+        }
+    ).write_csv(manual_overrides_path)
+    output_dir = tmp_path / "silver"
+
+    result = _classify_regional_genres(
+        regional_overview_classification_path, indigenous_to_path, manual_overrides_path, output_dir
+    )
+
+    df = pl.read_parquet(result)
+    jazz_rows = df.filter(pl.col("item_id") == "Q8341")
+    parent_ids = set(jazz_rows.select("parent_id").to_series().to_list())
+    assert parent_ids == {"Q9778", "Q2579987"}
+
+
+def test_classify_regional_genres_excludes_indigenous_to_false_positive(tmp_path: Path) -> None:
+    # Han Chinese music carries a real P2341 value; excluding it must stop the automated
+    # indigenous_to seed signal from firing, so it (and its subgenre) stay canonical.
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
+    indigenous_to_path = _write_indigenous_to(tmp_path)
+    manual_overrides_path = _write_manual_overrides(tmp_path)
+    manual_indigenous_to_exclusions_path = tmp_path / "manual_indigenous_to_exclusions.csv"
+    pl.DataFrame(
+        {
+            "item_id": ["Q10376827"],
+            "item_label": ["Han Chinese music"],
+            "reason": ["test exclusion"],
+        }
+    ).write_csv(manual_indigenous_to_exclusions_path)
+    output_dir = tmp_path / "silver"
+
+    result = _classify_regional_genres(
+        regional_overview_classification_path,
+        indigenous_to_path,
+        manual_overrides_path,
+        output_dir,
+        manual_indigenous_to_exclusions_path=manual_indigenous_to_exclusions_path,
+    )
+
+    df = pl.read_parquet(result)
+    han_row = df.filter(pl.col("item_id") == "Q10376827").row(0, named=True)
+    assert not han_row["is_regional"]
+    assert han_row["regional_reason"] is None
+    subgenre_row = df.filter(pl.col("item_id") == "Q999999991").row(0, named=True)
+    assert not subgenre_row["is_regional"]
+
+
+def test_classify_regional_genres_requires_known_indigenous_to_exclusion_item_id(tmp_path: Path) -> None:
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
+    indigenous_to_path = _write_indigenous_to(tmp_path)
+    manual_overrides_path = _write_manual_overrides(tmp_path)
+    manual_indigenous_to_exclusions_path = tmp_path / "manual_indigenous_to_exclusions.csv"
+    pl.DataFrame(
+        {
+            "item_id": ["Q9730"],  # not in the fixture's indigenous_to rows
+            "item_label": ["classical music"],
+            "reason": ["test exclusion"],
+        }
+    ).write_csv(manual_indigenous_to_exclusions_path)
+    output_dir = tmp_path / "silver"
+
+    with pytest.raises(ValueError, match="no P2341 value"):
+        _classify_regional_genres(
+            regional_overview_classification_path,
+            indigenous_to_path,
+            manual_overrides_path,
+            output_dir,
+            manual_indigenous_to_exclusions_path=manual_indigenous_to_exclusions_path,
+        )

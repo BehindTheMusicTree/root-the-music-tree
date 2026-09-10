@@ -71,6 +71,54 @@ def test_select_main_parents_falls_back_to_lowest_qid(tmp_path: Path) -> None:
     assert secondary_df.row(0, named=True)["parent_id"] == "Q131578"
 
 
+def test_select_main_parents_prefers_genre_item_candidate_over_lower_qid_non_genre(tmp_path: Path) -> None:
+    # expressionist music: two candidate parents, no manual override. Q65937946 (modern classical
+    # music) is itself a genre item in this dataset (has its own item_id row below) despite its
+    # higher QID; Q159762 (Expressionism) is a lower-QID non-genre art-movement item present only as
+    # a parent_label. The genre-item candidate must win despite the higher QID.
+    rows = [
+        {
+            "item_id": "Q613707",
+            "item_label": "expressionist music",
+            "parent_id": "Q159762",
+            "parent_label": "Expressionism",
+            "item_url": "https://www.wikidata.org/wiki/Q613707",
+            "parent_url": "https://www.wikidata.org/wiki/Q159762",
+            "relation_type": "P279",
+        },
+        {
+            "item_id": "Q613707",
+            "item_label": "expressionist music",
+            "parent_id": "Q65937946",
+            "parent_label": "modern classical music",
+            "item_url": "https://www.wikidata.org/wiki/Q613707",
+            "parent_url": "https://www.wikidata.org/wiki/Q65937946",
+            "relation_type": "P279",
+        },
+        {
+            "item_id": "Q65937946",
+            "item_label": "modern classical music",
+            "parent_id": None,
+            "parent_label": None,
+            "item_url": "https://www.wikidata.org/wiki/Q65937946",
+            "parent_url": None,
+            "relation_type": None,
+        },
+    ]
+    regional_classification_path = _write_regional_classification(tmp_path, rows)
+    output_dir = tmp_path / "silver"
+
+    main_path, secondary_path = sg.select_main_parents(regional_classification_path, output_dir)
+
+    main_df = pl.read_parquet(main_path)
+    main_row = main_df.filter(pl.col("item_id") == "Q613707").row(0, named=True)
+    assert main_row["parent_id"] == "Q65937946"
+
+    secondary_df = pl.read_parquet(secondary_path)
+    secondary_row = secondary_df.filter(pl.col("item_id") == "Q613707").row(0, named=True)
+    assert secondary_row["parent_id"] == "Q159762"
+
+
 def test_select_main_parents_prefers_manual_override_over_lowest_qid(tmp_path: Path) -> None:
     rows = [*REGIONAL_CLASSIFICATION_ROWS]
     # toypop -> J-pop override, tagged manual_main_parent, coexisting with both automated candidates.

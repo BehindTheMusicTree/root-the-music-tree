@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 # .claude/skills/wikidata-canonical-roots/SKILL.md). A root that isn't in this list is new since the
 # last triage pass and must be reviewed — either given a real parent (manual_main_parent.csv),
 # flagged as theme/technique/out-of-scope, or added here once confirmed standalone.
-MANUAL_ACCEPTED_ROOTS_PATH = Path(__file__).parent / "manual_accepted_roots.csv"
+MANUAL_ACCEPTED_ROOTS_PATH = Path(__file__).parent / "manual_accepted_canonical_roots.csv"
 
 
 def extract_canonical_roots(hierarchy_path: Path, manual_accepted_roots_path: Path, output_dir: Path) -> Path:
@@ -30,9 +30,9 @@ def extract_canonical_roots(hierarchy_path: Path, manual_accepted_roots_path: Pa
     if not new_roots.is_empty():
         rows = [f"{r['item_id']} ({r['item_label']})" for r in new_roots.iter_rows(named=True)]
         raise ValueError(
-            "new canonical root(s) not in manual_accepted_roots.csv, needs triage per "
+            "new canonical root(s) not in manual_accepted_canonical_roots.csv, needs triage per "
             f"wikidata-canonical-roots (give it a real parent, flag it as theme/technique/out-of-scope, "
-            f"or add it to manual_accepted_roots.csv once confirmed standalone): {rows}"
+            f"or add it to manual_accepted_canonical_roots.csv once confirmed standalone): {rows}"
         )
 
     output_dir.mkdir(parents=True, exist_ok=True)

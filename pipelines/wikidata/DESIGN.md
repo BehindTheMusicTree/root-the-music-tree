@@ -265,6 +265,17 @@ Bronze `wikidata_genre_country_of_origin.parquet` (`P495`, "country of origin") 
 canonical umbrella genres too, e.g. jazz, heavy metal music, which would wrongly cascade regional
 status onto their real subgenres).
 
+`P2341` has the same false-positive pathology on rare occasions (e.g. "classical music" carries
+`indigenous_to = Europe`, a continent, not a specific people/culture), but unlike `P495` it can't be
+blanket-excluded — it's also the *only* regional signal for real regional genres with no other
+parent-based or property-based signal at all (e.g. "Han Chinese music"). A git-tracked,
+hand-curated `src/wikidata/silver/manual_indigenous_to_exclusions.csv` (columns
+`item_id,item_label,reason`) lets a data expert drop specific false-positive `item_id`s from the
+`indigenous_to` seed source only, one at a time, before the seed set is built. Each `item_id` must
+already carry a `P2341` value in Bronze `wikidata_genre_indigenous_to.parquet` — the pipeline
+raises otherwise, since an exclusion with nothing to exclude is almost certainly a stale/typo'd
+entry.
+
 #### 2.3.2 Rule: four seed sources
 
 Three kinds of items seed the regional graph and are themselves flagged `is_regional = True`, not
@@ -294,6 +305,20 @@ merely a launching point for other items:
   parent edge (`relation_type = "manual_override_parent"`), replacing its null-parent row. Every
   row must set it; a row with it missing or blank fails the pipeline at this step rather than
   silently leaving the item an orphan root.
+
+  This synthetic edge does **not** automatically win `5_main_parent_selection`'s lowest-QID
+  fallback the way `manual_main_parent.csv`'s edge always does — it's just another candidate
+  parent edge. If the item already has a genuine competing parent edge with a lower numeric QID,
+  that edge wins main-parent selection instead, and the override silently fails to nest the item
+  under its intended overview even though the synthetic edge still exists (it stays `is_regional`
+  either way, since regional status only needs *any* parent edge into a seed, but the item can end
+  up parented to the wrong node instead of its overview umbrella). An optional
+  `exclude_other_parents` column (same shape and meaning as `manual_main_parent.csv`'s, see
+  [2.3.4](#234-manual_main_parentcsv-pinning-an-items-main-parent)) fixes this: set it to `"true"`
+  to drop the item's other candidate parent edges too, leaving the override edge as the only
+  candidate so it always wins main-parent selection. Leave it blank (the default) to preserve the
+  existing behavior for items where the override only needs to establish `is_regional`, not control
+  which node the item nests under.
 
 #### 2.3.3 Cascade
 
@@ -392,7 +417,14 @@ item:
 - If the item has a `manual_main_parent.csv` synthetic edge (`relation_type =
   "manual_main_parent"`, applied upstream in [2.3.4](#234-manual_main_parentcsv-main-parent-override)),
   that edge always wins — a data expert's explicit pick.
-- Otherwise, the parent with the lowest numeric QID wins.
+- Otherwise, among the item's candidate parents, one that is itself a genre item in this dataset
+  (i.e. present as its own `item_id`, not just referenced as a `parent_label` — e.g. "modern
+  classical music") is preferred over one that isn't (e.g. "Expressionism", an art-movement item
+  with no `item_id` row of its own); the lowest numeric QID is the final tiebreak among whatever's
+  left. Preferring a real genre item avoids picking a non-genre parent that can never itself be
+  `parent_is_canonical` — which would otherwise orphan the item as a root in
+  `7_canonical_hierarchy` (via `hierarchy_utils.py`'s `promote_orphans_to_roots`) even though a
+  genuine genre parent was available all along.
 
 > ⚠️ **Provisional / trial-and-error:** the lowest-QID fallback is a placeholder, not a considered
 > rule. Live SPARQL queries against the real genre extension found that 2,727 of ~6,337 genre items
@@ -517,12 +549,12 @@ promoted to a synthetic root itself.
 pointing at an item with no row of its own) for manual triage — see
 `.claude/skills/wikidata-canonical-roots/SKILL.md`.
 
-#### 2.8.1 `manual_accepted_roots.csv` guard-rail
+#### 2.8.1 `manual_accepted_canonical_roots.csv` guard-rail
 
-A root that isn't already in the git-tracked `manual_accepted_roots.csv` is new since the last
-triage pass and raises, rather than silently reappearing in the output — a curator must give it a
-real parent (`manual_main_parent.csv`), flag it as theme/technique/out-of-scope (§2.1), or add it
-to `manual_accepted_roots.csv` once confirmed genuinely standalone.
+A root that isn't already in the git-tracked `manual_accepted_canonical_roots.csv` is new since the
+last triage pass and raises, rather than silently reappearing in the output — a curator must give
+it a real parent (`manual_main_parent.csv`), flag it as theme/technique/out-of-scope (§2.1), or add
+it to `manual_accepted_canonical_roots.csv` once confirmed genuinely standalone.
 
 This is deliberately diff-based rather than a blanket check: dropping a broad umbrella item (e.g.
 "popular music") as theme/technique/out-of-scope legitimately orphans many real subgenres into
