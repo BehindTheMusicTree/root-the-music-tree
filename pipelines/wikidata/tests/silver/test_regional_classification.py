@@ -186,20 +186,31 @@ def _write_manual_main_parent(tmp_path: Path) -> Path:
     return manual_main_parent_path
 
 
+def _write_manual_canonical_parent_additions(tmp_path: Path) -> Path:
+    manual_canonical_parent_additions_path = tmp_path / "manual_canonical_parent_additions.csv"
+    pl.DataFrame(schema={"item_id": pl.Utf8, "item_label": pl.Utf8, "reason": pl.Utf8}).write_csv(
+        manual_canonical_parent_additions_path
+    )
+    return manual_canonical_parent_additions_path
+
+
 def _classify_regional_genres(
     regional_overview_classification_path: Path,
     indigenous_to_path: Path,
     manual_overrides_path: Path,
     output_dir: Path,
     manual_main_parent_path: Path | None = None,
+    manual_canonical_parent_additions_path: Path | None = None,
     *,
     tmp_path: Path | None = None,
 ) -> Path:
+    tmp_path = tmp_path or output_dir.parent
     return sr.classify_regional_genres(
         regional_overview_classification_path,
         indigenous_to_path,
         manual_overrides_path,
-        manual_main_parent_path or _write_manual_main_parent(tmp_path or output_dir.parent),
+        manual_canonical_parent_additions_path or _write_manual_canonical_parent_additions(tmp_path),
+        manual_main_parent_path or _write_manual_main_parent(tmp_path),
         output_dir,
     )
 
