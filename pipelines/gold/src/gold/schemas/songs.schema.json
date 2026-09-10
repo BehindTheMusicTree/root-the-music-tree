@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/BehindTheMusicTree/the-music-tree-pipelines/gold/songs.schema.json",
+  "title": "Reconciled songs export",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "title": { "type": "string", "minLength": 1 },
+      "artist": { "type": "string", "minLength": 1 },
+      "youtube_video_id": { "type": "string", "minLength": 1 },
+      "genre_name": { "type": "string", "minLength": 1 }
+    },
+    "required": ["title", "artist", "youtube_video_id", "genre_name"],
+    "additionalProperties": false
+  }
+}
