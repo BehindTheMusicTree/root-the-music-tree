@@ -16,6 +16,7 @@ from wikidata.silver.non_genre_pruning import (
 )
 from wikidata.silver.regional_classification import (
     MANUAL_CANONICAL_PARENT_ADDITIONS_PATH,
+    MANUAL_INDIGENOUS_TO_EXCLUSIONS_PATH,
     MANUAL_MAIN_PARENT_PATH,
     MANUAL_OVERRIDES_PATH,
     classify_regional_genres,
@@ -48,6 +49,7 @@ regional_classification_path = classify_regional_genres(
     MANUAL_OVERRIDES_PATH,
     MANUAL_CANONICAL_PARENT_ADDITIONS_PATH,
     MANUAL_MAIN_PARENT_PATH,
+    MANUAL_INDIGENOUS_TO_EXCLUSIONS_PATH,
     silver_dir,
 )
 main_parent_selection_path, _secondary_parents_path = select_main_parents(regional_classification_path, silver_dir)
