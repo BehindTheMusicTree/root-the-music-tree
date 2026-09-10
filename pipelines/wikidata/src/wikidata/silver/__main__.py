@@ -12,6 +12,7 @@ from wikidata.silver.non_genre_pruning import (
     MANUAL_OUT_OF_SCOPE_GENRES_PATH,
     MANUAL_TECHNIQUE_GENRES_PATH,
     MANUAL_THEME_GENRES_PATH,
+    MANUAL_UMBRELLA_CANONICAL_GENRES_PATH,
     prune_non_genre_items,
 )
 from wikidata.silver.regional_classification import (
@@ -38,6 +39,7 @@ non_genre_pruning_path = prune_non_genre_items(
     MANUAL_THEME_GENRES_PATH,
     MANUAL_TECHNIQUE_GENRES_PATH,
     MANUAL_OUT_OF_SCOPE_GENRES_PATH,
+    MANUAL_UMBRELLA_CANONICAL_GENRES_PATH,
     silver_dir,
 )
 regional_overview_classification_path = classify_regional_from_overviews(

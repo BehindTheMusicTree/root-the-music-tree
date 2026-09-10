@@ -1,4 +1,5 @@
 item_id,item_label,reason,overview_item_id,exclude_other_parents
+Q1089050,Latin alternative,"newly orphaned root after both its parents (alternative music Q1695023, Latin music Q18345375) were excluded as overly broad umbrellas; a Hispanic/Latin-world fusion genre with no single national home, nested under the Hispanic-world regional overview",LOCAL:hispanic-world,
 Q4118941,mezwed,"root item with no P279/P361 parent and no P2341/P495 value, but a Tunisian genre missed by the automated seed/indigenous_to/country_of_origin classification",Q936552,
 Q11331567,Pyonkobushi,"root item with no P279/P361 parent and no P2341/P495 value, but a Japanese genre missed by the automated seed/indigenous_to/country_of_origin classification",Q257533,
 Q126667584,Aire típico,"root item with no P279/P361 parent and no P2341/P495 value, but a Panamanian genre missed by the automated seed/indigenous_to/country_of_origin classification",Q6942240,
