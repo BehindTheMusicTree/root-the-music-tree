@@ -5,3 +5,5 @@ LOCAL:blues-rock,Blues/Rock,"synthetic canonical grouping node (no single Wikida
 LOCAL:pop-electronic,Pop electronic,synthetic canonical grouping node for electronic music (Q9778) subgenres with pop/dance/rock crossover appeal; user-requested regrouping
 LOCAL:core-electronic,Core electronic,synthetic canonical grouping node for electronic music (Q9778) subgenres not routed to Pop electronic; user-requested regrouping
 LOCAL:core-blues-rock,Core Blues/Rock,"synthetic canonical grouping node under LOCAL:blues-rock for the original blues/rock genres, sibling to pop rock (Q484641); user-requested regrouping"
+LOCAL:pop-hip-hop,Pop hip-hop,synthetic canonical grouping node for hip-hop (Q11401) subgenres with mainstream/pop/dance crossover appeal; user-requested regrouping
+LOCAL:core-hip-hop,Core hip-hop,synthetic canonical grouping node for hip-hop (Q11401) subgenres not routed to Pop hip-hop; user-requested regrouping
