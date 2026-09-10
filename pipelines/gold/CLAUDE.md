@@ -4,11 +4,11 @@ Supplements the root `CLAUDE.md` when working inside this pipeline. See the root
 
 ## Commands
 
-- **Run:** `uv run --package gold python -m gold` (reads `MUSICBRAINZ_SILVER_DIR`/`WIKIDATA_SILVER_DIR`, writes `GOLD_OUTPUT_DIR/1_canonical_genre_tree.json`, `1_genre_match.parquet`, `1_genre_match_unresolved.csv`, `2_songs.json`)
+- **Run:** `uv run --package gold python -m gold` (reads `MUSICBRAINZ_SILVER_DIR`/`WIKIDATA_SILVER_DIR`, writes `GOLD_OUTPUT_DIR/1_canonical_genre_tree.json`, `1_regional_genre_tree.json`, `1_genre_match.parquet`, `1_genre_match_unresolved.csv`, `2_songs.json`)
 
 ## Architecture
 
-**No Bronze/Silver of its own** — `gold` only reads the two upstream pipelines' Silver output and exports. Three steps, run in sequence by `src/gold/__main__.py`: `export_genre_tree` (`genre_tree_export.py`, independent of the other two), `genre_match` (`genre_match.py`), `export_songs` (`song_export.py`, consumes `genre_match`'s output). See `SCHEMA.md` for column/shape detail and `DESIGN.md` for the match-cascade rationale.
+**No Bronze/Silver of its own** — `gold` only reads the two upstream pipelines' Silver output and exports. Four steps, run in sequence by `src/gold/__main__.py`: `export_canonical_genre_tree` (`canonical_genre_tree_export.py`, independent of the rest) and `export_regional_genre_tree` (`regional_genre_tree_export.py`, independent of the rest) both share the recursive tree-builder in `genre_tree_builder.py`; `genre_match` (`genre_match.py`); `export_songs` (`song_export.py`, consumes `genre_match`'s output). See `SCHEMA.md` for column/shape detail and `DESIGN.md` for the match-cascade rationale.
 
 **No manual/on-demand scripts** — every export this pipeline produces runs automatically as part of `__main__.py`, same cadence as every other pipeline's daily run.
 

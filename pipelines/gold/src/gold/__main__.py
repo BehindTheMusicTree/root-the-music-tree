@@ -3,8 +3,9 @@ import logging
 from common.env import load_pipeline_env, require_env, resolve_pipeline_path
 
 import gold
+from gold.canonical_genre_tree_export import export_canonical_genre_tree
 from gold.genre_match import MANUAL_ACCEPTED_NON_GENRE_TAGS_PATH, MANUAL_GENRE_ALIAS_PATH, genre_match
-from gold.genre_tree_export import export_genre_tree
+from gold.regional_genre_tree_export import export_regional_genre_tree
 from gold.song_export import export_songs
 
 logging.basicConfig(level=logging.INFO)
@@ -13,7 +14,8 @@ musicbrainz_silver_dir = resolve_pipeline_path(gold.__file__, require_env("MUSIC
 wikidata_silver_dir = resolve_pipeline_path(gold.__file__, require_env("WIKIDATA_SILVER_DIR"))
 gold_output_dir = resolve_pipeline_path(gold.__file__, require_env("GOLD_OUTPUT_DIR"))
 
-export_genre_tree(wikidata_silver_dir, gold_output_dir)
+export_canonical_genre_tree(wikidata_silver_dir, gold_output_dir)
+export_regional_genre_tree(wikidata_silver_dir, gold_output_dir)
 genre_match_path = genre_match(
     musicbrainz_silver_dir / "3_song_example.parquet",
     wikidata_silver_dir / "7_canonical_hierarchy.parquet",
