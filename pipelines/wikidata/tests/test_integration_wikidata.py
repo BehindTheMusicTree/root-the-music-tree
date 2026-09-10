@@ -9,3 +9,25 @@ def test_genre_tree_query_returns_rows_from_the_live_endpoint() -> None:
 
     assert len(rows) > 1000
     assert any(row["item"] == "http://www.wikidata.org/entity/Q11399" for row in rows)  # rock music
+
+
+@pytest.mark.integration
+def test_indigenous_to_query_returns_rows_from_the_live_endpoint() -> None:
+    rows = wikidata_client.run_query(
+        wikidata_client.INDIGENOUS_TO_QUERY, variables=wikidata_client.INDIGENOUS_TO_QUERY_VARIABLES, timeout=60.0
+    )
+
+    assert len(rows) > 0
+    assert any(row["item"] == "http://www.wikidata.org/entity/Q10376827" for row in rows)  # Han Chinese music
+
+
+@pytest.mark.integration
+def test_country_of_origin_query_returns_rows_from_the_live_endpoint() -> None:
+    rows = wikidata_client.run_query(
+        wikidata_client.COUNTRY_OF_ORIGIN_QUERY,
+        variables=wikidata_client.COUNTRY_OF_ORIGIN_QUERY_VARIABLES,
+        timeout=60.0,
+    )
+
+    assert len(rows) > 0
+    assert any(row["item"] == "http://www.wikidata.org/entity/Q185676" for row in rows)  # fado

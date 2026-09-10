@@ -1,391 +1,417 @@
 # Schema
 
-Data dictionary and lineage notes for `wikidata`. See [README.md#pipeline](README.md#pipeline) for the Bronze layer overview.
+Data dictionary and lineage notes for `wikidata`. See [DESIGN.md](DESIGN.md) for the rationale and
+rules behind each step, and [README.md#pipeline](README.md#pipeline) for the top-to-bottom
+pipeline overview.
 
 ## Table of Contents
 
 - [Schema](#schema)
   - [Table of Contents](#table-of-contents)
-  - [Wikidata properties used](#wikidata-properties-used)
-  - [Bronze](#bronze)
-  - [Silver](#silver)
-    - [Overview](#overview)
-    - [1_item_links](#1_item_links)
-    - [2_regional_overview_classification](#2_regional_overview_classification)
-    - [3_regional_classification](#3_regional_classification)
-    - [4_genre_parents](#4_genre_parents)
-    - [5_hierarchy](#5_hierarchy)
+  - [1. Wikidata properties used](#1-wikidata-properties-used)
+    - [1.1 P31 ("instance of")](#11-p31-instance-of)
+    - [1.2 P279 ("subclass of")](#12-p279-subclass-of)
+    - [1.3 P361 ("part of")](#13-p361-part-of)
+    - [1.4 P2341 ("indigenous to")](#14-p2341-indigenous-to)
+    - [1.5 P495 ("country of origin")](#15-p495-country-of-origin)
+  - [2. Bronze](#2-bronze)
+    - [2.1 wikidata_genre_tree.parquet](#21-wikidata_genre_treeparquet)
+    - [2.2 wikidata_genre_indigenous_to.parquet](#22-wikidata_genre_indigenous_toparquet)
+    - [2.3 wikidata_genre_country_of_origin.parquet](#23-wikidata_genre_country_of_originparquet)
+  - [3. Silver](#3-silver)
+    - [3.1 Overview](#31-overview)
+    - [3.2 1_item_links](#32-1_item_links)
+    - [3.3 2_non_genre_pruning](#33-2_non_genre_pruning)
+    - [3.4 3_regional_overview_classification](#34-3_regional_overview_classification)
+    - [3.5 4_regional_classification](#35-4_regional_classification)
+    - [3.6 5_main_parent_selection](#36-5_main_parent_selection)
+    - [3.7 6_canonical_parents](#37-6_canonical_parents)
+    - [3.8 7_canonical_hierarchy](#38-7_canonical_hierarchy)
+    - [3.9 8_regional_hierarchy](#39-8_regional_hierarchy)
+    - [3.10 9_canonical_roots](#310-9_canonical_roots)
 
-## Wikidata properties used
+## 1. Wikidata properties used
 
-Wikidata models knowledge as items (`Q...` IDs) connected by properties (`P...` IDs). Three
-properties drive this pipeline's whole shape:
+Wikidata models knowledge as items (`Q...` IDs) connected by properties (`P...` IDs). Five
+properties drive this pipeline's whole shape.
 
-- **`P31` ("instance of")** — links an item to the class it directly belongs to. `wd:Q11399`
-  ("rock music") `wdt:P31` `wd:Q188451` ("music genre") means "rock music is a music genre." This
-  is Wikidata's class-membership edge — it's how Bronze finds the full set of genre items in the
-  first place (see `GENRE_TREE_QUERY`'s `?item wdt:P31 wd:Q188451` clause).
-- **`P279` ("subclass of")** — links a class to its more general parent class(es), building a
-  taxonomy. `wd:Q11399` ("rock music") `wdt:P279` `wd:Q373342` ("popular music") means "rock music
-  is a kind of popular music." This is the main edge that builds the genre _hierarchy_ — a genre
-  can have more than one `P279` parent, since Wikidata classes aren't a strict tree.
-- **`P361` ("part of")** — a meronymic (part-whole, not is-a) edge, used inconsistently across
-  genre items in place of or alongside `P279` for what is still, in practice, subgenre-of-genre
-  information. It's sparser than `P279` (~250 edges vs. ~9,000) and noisier (most `P361` targets
-  aren't themselves a `P31` music genre — e.g. "punk subculture"), but a meaningful minority of
-  edges are hierarchy information `P279` doesn't have at all — e.g. several juke/footwork/ghetto
-  house subgenres are only linked to their parent via `P361`. Bronze ingests the full `P361` edge
-  set raw and unfiltered, just as it already does for `P279`, tagged by `relation_type` (see
-  below) so consumers can tell the two edge types apart rather than silently merging two
-  different semantics into one column.
+The three taxonomy properties (`P31`, `P279`, `P361`) are not interchangeable and don't chain into
+each other the way you might expect — see [DESIGN.md#1-bronze](DESIGN.md#1-bronze). `P2341` and
+`P495` are separate, orthogonal kinds of edges (item-to-people and item-to-country, not
+item-to-item taxonomy) and aren't part of that chaining discussion.
 
-The three are not interchangeable and don't chain into each other the way you might expect — see
-below.
+### 1.1 P31 ("instance of")
 
-## Bronze
+Links an item to the class it directly belongs to. `wd:Q11399` ("rock music") `wdt:P31`
+`wd:Q188451` ("music genre") means "rock music is a music genre." This is Wikidata's
+class-membership edge — it's how Bronze finds the full set of genre items in the first place (see
+`GENRE_TREE_QUERY`'s `?item wdt:P31 wd:Q188451` clause).
 
-One Parquet file, `wikidata_genre_tree.parquet`, one row per (item, parent, relation_type) edge:
-every Wikidata item classified `P31` ("instance of") `Q188451` ("music genre") — the class
-extension, ~6,300 items as of this writing — plus each genre's direct `P279` ("subclass of") and
-`P361` ("part of") parent(s). See `wikidata_client.GENRE_TREE_QUERY` for the exact SPARQL.
+### 1.2 P279 ("subclass of")
 
-**Why `P31`, not a `P279*` walk from `Q188451`:** the intuitive query — "every item transitively
-`P279` subclass-of music genre" — returns only 14 items (verified live), mostly _meta-categories_
-rather than actual genres:
+Links a class to its more general parent class(es), building a taxonomy. `wd:Q11399` ("rock
+music") `wdt:P279` `wd:Q373342` ("popular music") means "rock music is a kind of popular music."
+This is the main edge that builds the genre _hierarchy_ — a genre can have more than one `P279`
+parent, since Wikidata classes aren't a strict tree.
 
-> `gharana`, `palo`, `game piece`, `opera genre`, `fusion music genre`, `jazz genre`, `electronic
-music genre`, `blues genre`, `folk music genre`, `world music genre`, `rock genre`, `music by
-instrument`, `Shengqiang`, plus `Q188451` itself.
+### 1.3 P361 ("part of")
 
-Note the pattern: `"jazz genre"`, `"rock genre"` are _classes of genre_, not genres — not the
-~6,300 actual genres like "rock music" or "bebop" that Bronze needs.
+A meronymic (part-whole, not is-a) edge, used inconsistently across genre items in place of or
+alongside `P279` for what is still, in practice, subgenre-of-genre information. It's sparser than
+`P279` (~250 edges vs. ~9,000) and noisier (most `P361` targets aren't themselves a `P31` music
+genre — e.g. "punk subculture"), but a meaningful minority of edges are hierarchy information
+`P279` doesn't have at all — e.g. several juke/footwork/ghetto house subgenres are only linked to
+their parent via `P361`. Bronze ingests the full `P361` edge set raw and unfiltered, just as it
+already does for `P279`, tagged by `relation_type` (see below) so consumers can tell the two edge
+types apart rather than silently merging two different semantics into one column.
 
-That's because Wikidata keeps the two relationships separate:
+### 1.4 P2341 ("indigenous to")
 
-- **Class membership** is `P31` — e.g. `wd:Q11399` "rock music" `wdt:P31` `wd:Q188451` "music genre".
-- **Subgenre hierarchy** is `P279`, but _between genre items_ — e.g. `wd:Q11399` "rock music"
-  `wdt:P279` `wd:Q373342` "popular music".
+Links an item to the people/ethnic group it originates from (e.g. `wd:Q10376827` "Han Chinese
+music" `wdt:P2341` `wd:Q49103` "Han Chinese"). This is an ethnographic attribute of the item
+itself, not a genre-to-genre taxonomy edge like `P279`/`P361` — its cardinality is independent of
+an item's parent count, so it's ingested into its own Bronze table
+(`wikidata_genre_indigenous_to.parquet`, see below) rather than into `wikidata_genre_tree.parquet`.
+See [DESIGN.md#23-4_regional_classification](DESIGN.md#23-4_regional_classification) for why it's
+needed.
 
-That `P279` edge doesn't chain back up to `Q188451`. Confirmed live:
+### 1.5 P495 ("country of origin")
 
-```sparql
-ASK { wd:Q373342 wdt:P279* wd:Q188451 }   # → false
-```
+Links an item to the country it originated in (e.g. `wd:Q1198131` "morna" `wdt:P495` `wd:Q1011`
+"Cape Verde"). Same shape as `P2341` above: a per-item attribute, not a genre-to-genre taxonomy
+edge, independent of an item's `P279`/`P361` parent count, so it's ingested into its own Bronze
+table (`wikidata_genre_country_of_origin.parquet`, see below) rather than into
+`wikidata_genre_tree.parquet`. See
+[DESIGN.md#23-4_regional_classification](DESIGN.md#23-4_regional_classification) for why it's not
+used as a classification signal.
 
-So a `P279*` walk from `Q188451` finds only the 14 meta-category items above, and silently misses
-"rock music" and every other real genre — their `P279` parent chains lead to broader _concepts_
-like "popular music", not back to the "music genre" class they're an _instance_ of.
+## 2. Bronze
 
-**Parents are not restricted to also being a music genre instance.** A genre's `P279`/`P361`
-edges routinely point at non-genre classes too — e.g. "opera" (`Q1344`) is `P279` both "classical
-music" and "composed musical work" (`Q207628`, not itself `P31` music genre). Bronze ingests this
-raw and unfiltered, consistent with the "as-is" bronze principle used for MusicBrainz's tables
-(see [`../musicbrainz/SCHEMA.md`](../musicbrainz/SCHEMA.md)); flagging genre-only parents and
-pruning to a single parent per item is Silver-layer work — see
-[`4_genre_parents`](#4_genre_parents) (flagging) and [`5_hierarchy`](#5_hierarchy) (pruning) below.
-An item with neither a `P279`
-nor a `P361` parent (a root, ~488 of
-them as of this writing — down from ~510 pre-`P361`, since 22 formerly-root items turned out to
-have only a `P361` parent) gets a single row with `parent_id`/`parent_label`/`relation_type` all
-null.
+Three Parquet files, one per query in `wikidata_client.py`. See
+[DESIGN.md#1-bronze](DESIGN.md#1-bronze) for why `P31` (not a `P279*` walk) is the root query, why
+parents aren't restricted to genre items, and why `P2341`/`P495` are ingested into their own tables
+instead of `wikidata_genre_tree.parquet`.
+
+### 2.1 wikidata_genre_tree.parquet
+
+One row per (item, parent, relation_type) edge: every Wikidata item classified `P31` ("instance
+of") `Q188451` ("music genre") — the class extension, ~6,300 items as of this writing — plus each
+genre's direct `P279` ("subclass of") and `P361` ("part of") parent(s). See
+`wikidata_client.GENRE_TREE_QUERY` for the exact SPARQL.
+
+An item with neither a `P279` nor a `P361` parent (a root, ~486 of them as of this writing — down
+from ~510 pre-`P361`, since 22 formerly-root items turned out to have only a `P361` parent) gets a
+single row with `parent_id`/`parent_label`/`relation_type` all null.
 
 | Column        | Type | Meaning                                                                          |
-| ------------- | ---- | -------------------------------------------------------------------------------- |
+| ------------- | ---- | ---------------------------------------------------------------------------------- |
 | item_id       | str  | Wikidata QID of the genre (e.g. `Q11399`)                                        |
-| item_label    | str  | English label for `item_id` (e.g. "rock music")                                  |
+| item_label    | str  | Label for `item_id` (English, falling back to a language-agnostic `mul` label if no English label exists) (e.g. "rock music")                                  |
 | parent_id     | str? | QID of a direct `P279`/`P361` parent within the genre tree, or null              |
-| parent_label  | str? | English label for `parent_id`, or null                                           |
+| parent_label  | str? | Same fallback as `item_label`, for `parent_id`, or null                                           |
 | relation_type | str? | `"P279"` or `"P361"` — which property produced this edge, or null for a root row |
-
-**Deliberate deviation from the raw query response**: Wikidata's SPARQL results return full
-entity URIs (`http://www.wikidata.org/entity/Q11399`), not bare QIDs — `ingest.py`
-strips the `http://www.wikidata.org/entity/` prefix before writing Parquet, since the QID is the
-natural join key and the full URI is otherwise dead weight. Labels are passed through as-is.
 
 A multi-parent item (Wikidata classes aren't a strict tree — a genre can have more than one
 `P279`/`P361` parent) produces one row per parent, so `item_id` is not unique on its own.
 
-## Silver
+### 2.2 wikidata_genre_indigenous_to.parquet
 
-All five steps below are produced by `wikidata.silver`. `1_item_links`,
-`2_regional_overview_classification`, `3_regional_classification`, and `4_genre_parents` preserve
-the Bronze edge-list grain 1:1 (`item_id` still not unique) — none of them drop rows; downstream
-consumers filter on the added columns themselves. `5_hierarchy` is different: it's the first step
-that actually drops rows, and the first where `item_id` is unique — see below.
+One row per (item, indigenous-to-group) pair: every `P31` music genre item that also has at least
+one `P2341` ("indigenous to") value. Unlike `wikidata_genre_tree.parquet`, items with no `P2341`
+value are absent entirely — there is no "root row" placeholder, since absence of an ethnographic
+tag isn't a hierarchy position the way a missing parent is. See
+`wikidata_client.INDIGENOUS_TO_QUERY`.
 
-### Overview
+| Column               | Type | Meaning                                                             |
+| -------------------- | ---- | ---------------------------------------------------------------------- |
+| item_id               | str  | Wikidata QID of the genre (e.g. `Q10376827`)                        |
+| indigenous_to_id      | str  | Wikidata QID of the people/ethnic group (e.g. `Q49103`)              |
+| indigenous_to_label   | str  | Same English/`mul`-fallback label as `item_label`, for `indigenous_to_id` (e.g. "Han Chinese")            |
+
+A genre with several `P2341` values produces one row per value, so `item_id` is not unique on its
+own (as of this writing: 207 rows).
+
+### 2.3 wikidata_genre_country_of_origin.parquet
+
+One row per (item, country) pair: every `P31` music genre item that also has at least one `P495`
+("country of origin") value. Same absence rule as `wikidata_genre_indigenous_to.parquet` — items
+with no `P495` value are absent entirely, no "root row" placeholder. See
+`wikidata_client.COUNTRY_OF_ORIGIN_QUERY`.
+
+| Column                  | Type | Meaning                                                        |
+| ------------------------ | ---- | ----------------------------------------------------------------- |
+| item_id                  | str  | Wikidata QID of the genre (e.g. `Q1198131`)                    |
+| country_of_origin_id     | str  | Wikidata QID of the country (e.g. `Q1011`)                     |
+| country_of_origin_label  | str  | Same English/`mul`-fallback label as `item_label`, for `country_of_origin_id` (e.g. "Cape Verde")   |
+
+A genre with several `P495` values produces one row per value, so `item_id` is not unique on its
+own (as of this writing: 2,496 rows).
+
+## 3. Silver
+
+All nine steps below are produced by `wikidata.silver`. `1_item_links` preserves the Bronze
+edge-list grain 1:1 (`item_id` still not unique) — it doesn't drop rows; downstream consumers
+filter on the added columns themselves. `2_non_genre_pruning` is the step that drops rows, via
+manual CSV backstops (theme/technique/out-of-scope items — see
+[DESIGN.md#21-2_non_genre_pruning](DESIGN.md#21-2_non_genre_pruning)), run as early as possible so
+every step downstream works with a smaller, cleaner tree. `3_regional_overview_classification` and
+`4_regional_classification` preserve whatever grain they receive unchanged aside from their own
+added columns (`4_regional_classification` also injects one synthetic edge per
+`manual_main_parent.csv` row — see below). `5_main_parent_selection` is the step that collapses
+each item down to exactly one main-parent edge, splitting every other candidate parent edge off
+into a sibling `5_secondary_parents.parquet` rather than dropping it; `6_canonical_parents`
+preserves that one-row-per-item grain unchanged aside from its own added column.
+`7_canonical_hierarchy` and `8_regional_hierarchy` are the steps that prune to the final hierarchy
+shape — see below.
+
+### 3.1 Overview
 
 | Step                                                                        | Reads                                        | Writes                                                                       | Adds                                | Key result (as of this writing)                                                                                                                                                 |
 | --------------------------------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`1_item_links`](#1_item_links)                                             | Bronze `wikidata_genre_tree.parquet`         | `1_item_links.parquet`                                                       | `item_url`, `parent_url`            | `item_url` populated for all 9,724 rows; `parent_url` null only for the 488 root rows                                                                                            |
-| [`2_regional_overview_classification`](#2_regional_overview_classification) | `1_item_links.parquet`                       | `2_regional_overview_classification.parquet`                                 | `is_regional_overview`, `classification_reason` | 401 of 9,724 rows (299 of 6,338 items) tagged `is_regional_overview = true` / `regional_overview` (e.g. "music of Kenya") — not dropped                                          |
-| [`3_regional_classification`](#3_regional_classification)                   | `2_regional_overview_classification.parquet` | `3_regional_classification.parquet`                                          | `is_regional`, `regional_reason`    | 3,377 of 6,338 items (~53%) flagged `is_regional` — 299 seed, 1,392 direct, 1,686 inherited (exploration-phase finding, see callout below)                                      |
-| [`4_genre_parents`](#4_genre_parents)                                       | `3_regional_classification.parquet`          | `4_genre_parents.parquet`                                                    | `parent_is_genre`                   | 2,988 of 9,724 rows have a non-genre parent; 488 rows are roots (`parent_is_genre = null`)                                                                                      |
-| [`5_hierarchy`](#5_hierarchy)                                               | `4_genre_parents.parquet`                    | `5_hierarchy.parquet` (canonical), `5_regional_hierarchy.parquet` (regional) | prunes to one row per `item_id`     | canonical: 2,662 final rows from 2,961 items; regional: 3,377 final rows from 3,377 items (seed items are real nodes, not promoted synthetic roots); 299 items vanish from both |
+| [`1_item_links`](#32-1_item_links)                                          | Bronze `wikidata_genre_tree.parquet`         | `1_item_links.parquet`                                                       | `item_url`, `parent_url`, `has_item_label`, `has_parent_label` | `item_url` populated for all 9,729 rows; `parent_url` null only for the 486 root rows                                                                                            |
+| [`2_non_genre_pruning`](#33-2_non_genre_pruning)                            | `1_item_links.parquet`, `manual_theme_genres.csv`, `manual_technique_genres.csv`, `manual_out_of_scope_genres.csv` | `2_non_genre_pruning.parquet`                                                | none — drops rows only              | theme/technique/out-of-scope items dropped entirely (see [DESIGN.md#21-2_non_genre_pruning](DESIGN.md#21-2_non_genre_pruning))                                                    |
+| [`3_regional_overview_classification`](#34-3_regional_overview_classification) | `2_non_genre_pruning.parquet`                | `3_regional_overview_classification.parquet`                                 | `is_regional_overview`, `classification_reason` | 401 of 9,729 rows (299 of 6,344 items) tagged `is_regional_overview = true` / `regional_overview` (e.g. "music of Kenya") — not dropped                                          |
+| [`4_regional_classification`](#35-4_regional_classification)                | `3_regional_overview_classification.parquet`, Bronze `wikidata_genre_indigenous_to.parquet`, `manual_regional_overrides.csv`, `manual_main_parent.csv` | `4_regional_classification.parquet`                                          | `is_regional`, `regional_reason`    | 3,879 of 6,404 remaining items flagged `is_regional` — 359 seed, 179 indigenous_to, 180 manual_override, 1,614 direct, 1,547 inherited (see [DESIGN.md#23-4_regional_classification](DESIGN.md#23-4_regional_classification))                                      |
+| [`5_main_parent_selection`](#36-5_main_parent_selection)                    | `4_regional_classification.parquet`          | `5_main_parent_selection.parquet`, `5_secondary_parents.parquet`             | none — selects/splits rows only     | collapses every item to exactly one main-parent edge (manual override wins, else lowest-QID); all other candidate edges kept in `5_secondary_parents.parquet` |
+| [`6_canonical_parents`](#37-6_canonical_parents)                            | `5_main_parent_selection.parquet`            | `6_canonical_parents.parquet`                                                | `parent_is_canonical`               | flags whether each item's chosen main parent is itself an actual musical style |
+| [`7_canonical_hierarchy`](#38-7_canonical_hierarchy)                        | `6_canonical_parents.parquet`                | `7_canonical_hierarchy.parquet`                                              | prunes to one row per `item_id` (canonical only) | clean, one-parent-per-item canonical edge list |
+| [`8_regional_hierarchy`](#39-8_regional_hierarchy)                          | `6_canonical_parents.parquet`                | `8_regional_hierarchy.parquet`                                               | prunes to one row per `item_id` (regional only) | clean, one-parent-per-item regional edge list |
+| [`9_canonical_roots`](#310-9_canonical_roots)                               | `7_canonical_hierarchy.parquet`              | `9_canonical_roots.parquet`                                                  | filters to root items               | for manual exploration of the "too many roots" open question (see [DESIGN.md#263-under-exploration--root-count](DESIGN.md#263-under-exploration--root-count)) |
 
-Each step's own section below has the full column definitions, rules, and profiling detail behind
-these numbers — this table is just the fast top-to-bottom path through the chain.
+Each step's own section below has the full column definitions and profiling detail behind these
+numbers; see [DESIGN.md](DESIGN.md) for why each step exists and its rules.
 
-### 1_item_links
+### 3.2 1_item_links
 
 `1_item_links.parquet`: `wikidata_genre_tree.parquet` (Bronze) unchanged, plus two columns giving
-the human-browsable Wikidata page for `item_id` and, where present, `parent_id`.
+the human-browsable Wikidata page for `item_id` and, where present, `parent_id`, and two columns
+flagging whether `item_label`/`parent_label` are a real label or the QID-fallback string.
 
-| Column     | Type | Meaning                                                                            |
-| ---------- | ---- | ----------------------------------------------------------------------------------- |
-| item_url   | str  | `https://www.wikidata.org/wiki/` + `item_id` — the item's browsable Wikidata page   |
-| parent_url | str? | `https://www.wikidata.org/wiki/` + `parent_id`, or null when `parent_id` is null    |
-
-**Why this is needed:** `item_id`/`parent_id` are bare QIDs (e.g. `Q11399`) — the natural join key,
-but not something a person can act on directly. Manual review (profiling output, ad-hoc DuckDB
-queries, the exploration notebook) otherwise requires manually prepending the wiki page prefix to
-look an item up. This is deliberately the human-facing `/wiki/` page prefix, not the
-`http://www.wikidata.org/entity/` RDF entity URI that Bronze's `ingest.py` already strips off (see
-[Bronze](#bronze) above) — that prefix identifies the machine data URI, not the browsable page, so
-it isn't reusable here.
+| Column           | Type | Meaning                                                                            |
+| ---------------- | ---- | ----------------------------------------------------------------------------------- |
+| item_url         | str  | `https://www.wikidata.org/wiki/` + `item_id` — the item's browsable Wikidata page   |
+| parent_url       | str? | `https://www.wikidata.org/wiki/` + `parent_id`, or null when `parent_id` is null    |
+| has_item_label   | bool | `False` when `item_label == item_id` (Wikidata's label service found no English/`mul` label and fell back to printing the QID) |
+| has_parent_label | bool? | Same check for `parent_label`/`parent_id`, or null when `parent_id` is null       |
 
 **Data profile (as of this writing):**
 
 | Metric                                     |  Rows | Distinct `item_id`s |
 | ------------------------------------------- | ----: | -------------------: |
-| Total                                       | 9,724 |                6,338 |
-| `parent_url` populated                      | 9,236 |                    — |
-| `parent_url` null (root, `parent_id` null)  |   488 |                    — |
+| Total                                       | 9,729 |                6,344 |
+| `parent_url` populated                      | 9,243 |                    — |
+| `parent_url` null (root, `parent_id` null)  |   486 |                    — |
 
 Regenerate with `uv run --package wikidata python -m wikidata.silver.profile` (reads
 `SILVER_OUTPUT_DIR/1_item_links.parquet`, read-only, no new data fetched) — these numbers will
 drift as Wikidata's live genre tree changes.
 
-### 2_regional_overview_classification
+### 3.3 2_non_genre_pruning
 
-`2_regional_overview_classification.parquet`: `1_item_links.parquet` unchanged, plus two
+`2_non_genre_pruning.parquet`: `1_item_links.parquet` with theme, technique, and out-of-scope
+items dropped entirely, per three manual CSV backstops. Otherwise unchanged — no columns added.
+Runs as the very first classification step, before `3_regional_overview_classification` and
+`4_regional_classification`, so every step downstream works with a smaller, cleaner tree. See
+[DESIGN.md#21-2_non_genre_pruning](DESIGN.md#21-2_non_genre_pruning) for the three CSVs' scope and
+the fail-fast validation each one gets.
+
+No columns added; schema is identical to `1_item_links.parquet`.
+
+**Data profile (as of this writing):**
+
+| Metric                                     |  Rows | Distinct `item_id`s |
+| ------------------------------------------- | ----: | -------------------: |
+| Total (before drop)                        | 9,729 |                6,344 |
+| Dropped (theme/technique/out-of-scope)      |     — |                    — |
+
+Regenerate with `uv run --package wikidata python -m wikidata.silver.profile` (reads
+`SILVER_OUTPUT_DIR/2_non_genre_pruning.parquet`, read-only, no new data fetched) — these numbers
+will drift as Wikidata's live genre tree changes.
+
+### 3.4 3_regional_overview_classification
+
+`3_regional_overview_classification.parquet`: `2_non_genre_pruning.parquet` unchanged, plus two
 columns classifying whether each row's `item_id` is a regional-overview article (e.g. "music of Kenya")
-rather than an actual musical style.
+rather than an actual musical style. See
+[DESIGN.md#22-3_regional_overview_classification](DESIGN.md#22-3_regional_overview_classification)
+for why this classification exists, its rule, and the manual-CSV backstop mechanics.
 
 | Column                | Type | Meaning                                                                                    |
 | --------------------- | ---- | -------------------------------------------------------------------------------------------- |
 | is_regional_overview  | bool | `True` if `item_label` was classified as a regional overview article, not a musical style     |
-| classification_reason | str? | Why `is_regional_overview` is `True` (see below), or null when `is_regional_overview` is `False` |
-
-**Why classification is needed:** Wikidata's `P31` "instance of" `Q188451` ("music genre") class
-extension — Bronze's source query — is noisy. It includes items that are not themselves musical
-styles, e.g. "music of Kenya" (a country's music scene overview, not a style). Left unflagged,
-these would pollute any genre hierarchy or genre-matching built on top of this data.
-
-**`classification_reason` values:**
-
-| Value               | Rule                                   | Rationale                                                                                                                                                                                |
-| ------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `regional_overview` | `item_label` starts with `"music of "` | Wikidata's national/regional music overview articles (e.g. "music of France", "music of Kenya") — ~300 of ~6,300 items as of this writing, always this exact prefix, never a genre name. |
-
-This tags, it does not exclude: `regional_overview` items stay in every downstream Parquet file
-and are the seed set [`3_regional_classification`](#3_regional_classification) propagates
-`is_regional` down from — any genre item with a parent edge into one of these becomes a regional
-genre, and the seeds themselves become regional genre nodes in their own right (see
-[`5_hierarchy`](#5_hierarchy)).
-
-This is a first classification pass covering the single highest-confidence, most mechanical rule
-found during analysis. Other non-genre categories are known to exist in the Bronze data (musical
-forms/techniques like "fugue" or "polyphony", ensemble/format labels like "big band music") but
-aren't covered here yet — they don't reduce to one clean, false-positive-free rule the way
-`regional_overview` does, and are left for a later Silver step.
+| classification_reason | str? | Why `is_regional_overview` is `True`, or null when `is_regional_overview` is `False`         |
 
 **Data profile (as of this writing):**
 
 | Metric                                        |  Rows | Distinct `item_id`s |
 | ---------------------------------------------- | ----: | ------------------: |
-| Total                                          | 9,724 |               6,338 |
-| `is_regional_overview = false`                 | 9,323 |               6,039 |
+| Total                                          | 9,729 |               6,344 |
+| `is_regional_overview = false`                 | 9,328 |               6,045 |
 | `is_regional_overview = true` (`regional_overview`) |   401 |                 299 |
 
 Regenerate with `uv run --package wikidata python -m wikidata.silver.profile` (reads
-`SILVER_OUTPUT_DIR/2_regional_overview_classification.parquet`, read-only, no new data fetched) — these numbers
+`SILVER_OUTPUT_DIR/3_regional_overview_classification.parquet`, read-only, no new data fetched) — these numbers
 will drift as Wikidata's live genre tree changes.
 
-### 3_regional_classification
+### 3.5 4_regional_classification
 
-`3_regional_classification.parquet`: `2_regional_overview_classification.parquet` unchanged, plus two columns
-flagging whether each row's `item_id` is a **regional genre** — nationally or ethnically specific
-(e.g. "morna", "fado", and the "music of X" seed items themselves), as opposed to a genre with no
-particular regional grounding (e.g. "rock music").
+`4_regional_classification.parquet`: `3_regional_overview_classification.parquet` unchanged aside from two added
+columns flagging whether each row's `item_id` is a **regional genre** — nationally or ethnically
+specific (e.g. "morna", "fado", and the "music of X" seed items themselves), as opposed to a genre
+with no particular regional grounding (e.g. "rock music"). This step also reads `manual_main_parent.csv`
+and, before the cascade below runs, injects one synthetic edge per row (tagged
+`relation_type = "manual_main_parent"`) — a data expert's explicit main-parent pick for an item,
+consumed downstream by [`5_main_parent_selection`](#36-5_main_parent_selection). See
+[DESIGN.md#23-4_regional_classification](DESIGN.md#23-4_regional_classification) for why this step
+reads the extra Bronze/CSV inputs, its seeding/cascade rule, and open caveats.
 
 | Column          | Type | Meaning                                                                               |
 | --------------- | ---- | ------------------------------------------------------------------------------------- |
 | is_regional     | bool | Whether `item_id` is a regional genre — set for every item, including non-genre items |
-| regional_reason | str? | `"seed"`, `"direct"`, `"inherited"`, or null (see rule below)                         |
-
-**Rule:** `regional_overview` items (from `2_regional_overview_classification`, e.g. "music of Kenya", "music
-of Cape Verde") are the seed set and are themselves flagged `is_regional = True` /
-`regional_reason = "seed"` — they are regional genre nodes in their own right, not merely a
-launching point for other items. A genre item is regional if **any one** of its parent edges
-points at a seed, or at an item already flagged regional — propagated down as a multi-source
-cascade, repeated to a fixpoint. `regional_reason` is `"direct"` when the item's own parent set
-includes a seed directly, `"inherited"` when it only reaches regional status via an
-already-flagged parent.
-
-> ⚠️ **ANY-parent, not ALL-parent — confirmed by a real multi-parent case.** A naive "every parent
-> trail dead-ends in a seed" rule would miss real regional genres that also happen to have a clean
-> secondary parent: "Portuguese folk music" has one parent edge into "music of Portugal" (a seed)
-> and another into "European folk music" (not a seed) — live data confirms "European folk music"
-> is itself also considered a regional genre. Having _any_ parent edge into a regional item is
-> sufficient, regardless of whether the item also has a clean parent elsewhere. No curated
-> override list is needed: this structural rule alone catches both "morna" (direct seed hit) and
-> "fado" (inherited, two hops through "Portuguese folk music").
-
-> ⚠️ **Exploration phase — this rule will evolve.** Cascading from _every_ `regional_overview`
-> seed, including continent-level overview articles ("music of Asia", "music of Europe", "music of
-> Africa", "music of the Americas") alongside country/ethnic-level ones ("music of Kenya", "music
-> of Cape Verde"), currently flags **~53% of all items** as regional (see profile below) — far more
-> than the ~367-item vanished-from-hierarchy baseline that originally motivated this step. That's
-> because continent-level seeds have large direct fan-out (e.g. "A-pop" is a direct child of
-> "music of Asia"). This is being kept as-is for now since the pipeline is still in an exploration
-> phase, not shipped as a settled design decision — narrowing the seed set to exclude
-> continent-level overview articles (so only country/ethnic-level pages seed the cascade) is a
-> likely future refinement once there's a concrete product need to get the regional/canonical split
-> tighter.
-
-> ⚠️ **Known Bronze gap, not yet investigated:** "variété française," a named example of a regional
-> genre, does not appear anywhere in the current Bronze extraction at all — not a `P279`/`P361`
-> gap, it's simply absent from the `P31` "music genre" class extension entirely. This needs deeper
-> investigation into why Wikidata's own query misses it (wrong assumed label, different
-> instance-of class, etc.) rather than being treated as a non-issue.
+| regional_reason | str? | `"seed"`, `"indigenous_to"`, `"manual_override"`, `"direct"`, `"inherited"`, or null |
 
 **Data profile (as of this writing):**
 
-| Metric                          | Distinct items |
-| ------------------------------- | -------------: |
-| Total items                     |          6,338 |
-| `is_regional = true`            |          3,377 |
-| `is_regional = false`           |          2,961 |
-| `regional_reason = "seed"`      |            299 |
-| `regional_reason = "direct"`    |          1,392 |
-| `regional_reason = "inherited"` |          1,686 |
+| Metric                                   | Distinct items |
+| ----------------------------------------- | -------------: |
+| Total items                               |          6,404 |
+| `is_regional = true`                      |          3,879 |
+| `is_regional = false`                     |          2,525 |
+| `regional_reason = "seed"`                |            359 |
+| `regional_reason = "indigenous_to"`       |            179 |
+| `regional_reason = "manual_override"`     |            180 |
+| `regional_reason = "direct"`              |          1,614 |
+| `regional_reason = "inherited"`           |          1,547 |
 
 Regenerate with `uv run --package wikidata python -m wikidata.silver.profile` (reads
-`SILVER_OUTPUT_DIR/3_regional_classification.parquet`, read-only, no new data fetched) — these
+`SILVER_OUTPUT_DIR/4_regional_classification.parquet`, read-only, no new data fetched) — these
 numbers will drift as Wikidata's live genre tree changes.
 
-### 4_genre_parents
+### 3.6 5_main_parent_selection
 
-`4_genre_parents.parquet`: `3_regional_classification.parquet` unchanged, plus one column flagging
-whether each row's `parent_id` is itself an actual musical style.
+`5_main_parent_selection.parquet` / `5_secondary_parents.parquet`: the first Silver step that
+actually prunes rather than flags. Reads `4_regional_classification.parquet` and, for every item
+with more than one candidate parent edge, picks exactly one as that item's **main** parent — a
+`manual_main_parent.csv` override (already injected as a synthetic edge tagged
+`relation_type = "manual_main_parent"` in `4_regional_classification`, see
+[3.5 4_regional_classification](#35-4_regional_classification)) wins if present, otherwise the
+candidate with the lowest numeric QID is picked as a provisional heuristic. Every other candidate
+edge is not dropped — it's written to the sibling `5_secondary_parents.parquet` instead. See
+[DESIGN.md#24-5_main_parent_selection](DESIGN.md#24-5_main_parent_selection) for the full rule and
+its provisional/trial-and-error caveat.
 
-| Column          | Type  | Meaning                                                                                                                    |
-| --------------- | ----- | -------------------------------------------------------------------------------------------------------------------------- |
-| parent_is_genre | bool? | Whether `parent_id` is `is_regional_overview = False` in `2_regional_overview_classification`; null for root rows (`parent_id` is null) |
+`5_main_parent_selection.parquet` has the exact same schema as
+[`4_regional_classification.parquet`](#35-4_regional_classification) (every column is carried
+through unchanged) but is reduced to one row per `item_id`.
 
-**Rule:** a parent counts as an actual musical style only if it is flagged `is_regional_overview = False` by
-`2_regional_overview_classification` — not merely present in Bronze's raw `P31` "music genre" extension. This
-keeps the Silver steps agreeing with each other: an edge into a `regional_overview` item like
-"music of Kenya" is `parent_is_genre = False`, the same as an edge into a concept that was never
-`P31` "music genre" at all (e.g. "opera" → "composed musical work").
-
-**Data profile (as of this writing):**
-
-| Metric                                     |  Rows |
-| ------------------------------------------ | ----: |
-| Total                                      | 9,724 |
-| `parent_is_genre = true`                   | 6,248 |
-| `parent_is_genre = false`                  | 2,988 |
-| `parent_is_genre = null` (root, no parent) |   488 |
-
-Non-genre parents span both a genre item tagged non-genre in step 1 (e.g. an edge into "music of
-Tanzania") and a parent that was never in Bronze's `P31` "music genre" extension at all (e.g.
-"national song" → "national anthem", "Renaissance music" → "Renaissance art") — both count as
-`parent_is_genre = false` under the rule above.
-
-Regenerate with `uv run --package wikidata python -m wikidata.silver.profile` (reads
-`SILVER_OUTPUT_DIR/4_genre_parents.parquet`, read-only, no new data fetched) — these numbers will
-drift as Wikidata's live genre tree changes.
-
-### 5_hierarchy
-
-`5_hierarchy.parquet` (canonical) and `5_regional_hierarchy.parquet` (regional): the first Silver
-step that actually prunes rather than flags. Reads `4_genre_parents.parquet` and reduces it to one
-row per genre item, split into two clean, directly-consumable genre hierarchy edge lists — a
-canonical one, excluding every `is_regional = true` item, and a regional one, containing only
-`is_regional = true` items (which now includes the `regional_overview` seed items themselves).
+`5_secondary_parents.parquet` — one row per demoted candidate parent edge:
 
 | Column        | Type | Meaning                                                                          |
-| ------------- | ---- | -------------------------------------------------------------------------------- |
-| item_id       | str  | Wikidata QID of the genre (e.g. `Q11399`) — **unique in this table**             |
-| item_label    | str  | English label for `item_id`                                                      |
+| ------------- | ---- | ---------------------------------------------------------------------------------- |
+| item_id       | str  | Wikidata QID of the genre (e.g. `Q133687529`)                                    |
+| item_label    | str  | Same English/`mul`-fallback label as in `1_item_links` (see above), for `item_id`  |
 | item_url      | str  | `https://www.wikidata.org/wiki/` + `item_id`                                     |
-| parent_id     | str? | QID of the single chosen parent, or null for a root                              |
-| parent_label  | str? | English label for `parent_id`, or null                                           |
-| parent_url    | str? | `https://www.wikidata.org/wiki/` + `parent_id`, or null for a root row           |
-| relation_type | str? | `"P279"` or `"P361"` — which property produced this edge, or null for a root row |
+| parent_id     | str  | QID of this demoted candidate parent                                             |
+| parent_label  | str  | Same fallback as `item_label`, for `parent_id`                                    |
+| parent_url    | str  | `https://www.wikidata.org/wiki/` + `parent_id`                                   |
+| relation_type | str? | `"P279"` or `"P361"` — which property produced this edge, or `"manual_main_parent"` if a manual override lost to another manual override's edge |
 
-**Rule**, applied in two stages, run separately for the two outputs:
-
-1. **Prune to same-graph edges.** For `5_hierarchy`, keep a row only if `is_regional_overview = False` for the
-   item itself and it is _not_ `is_regional`, and either `parent_id` is null (a root) or
-   `parent_is_genre = True` and the parent is not itself regional. For `5_regional_hierarchy`, keep
-   a row only if the item _is_ `is_regional` (seed items included), and either `parent_id` is null
-   or the parent is itself `is_regional = True`. Either way, an edge into a non-regional, non-genre
-   parent, or across the canonical/regional boundary, doesn't count as a legitimate hierarchy
-   parent.
-2. **Collapse multi-parent items to one row.** If an item still has more than one surviving parent
-   within its own output, keep only the edge to the parent with the lowest numeric QID.
-
-> ⚠️ **Provisional / tâtonnement:** the lowest-QID rule in stage 2 is an arbitrary placeholder, not
-> a considered design decision. QIDs are assigned by Wikidata in creation order and carry no
-> taxonomic meaning. It exists only because no better signal is currently available: live SPARQL
-> queries against the real genre extension found that **2,727 of ~6,337 genre items (~43%)** have
-> more than one `P279` parent even after Wikidata's own "best rank" resolution, and only **1 item
-> in the entire genre extension** has any `P279` statement marked `preferred` rank — Wikidata's own
-> disambiguation mechanism is essentially unused here. `musicbrainz/README.md` already documents
-> that the eventual single-parent hierarchy format for TheMusicTreeAPI is "not yet decided" — this
-> rule is a stand-in until that product/curation decision exists, and should be expected to change,
-> likely once real curation input (e.g. via GrowTheMusicTree) is available.
-
-**Known consequence — the two outputs diverge here.** In `5_hierarchy` (canonical), an item whose
-every parent edge points to a non-genre or regional parent (and which isn't itself a root) has all
-its rows dropped in stage 1 — it disappears entirely, not even as an implicit root (e.g. "opera" →
-"composed musical work"). In `5_regional_hierarchy`, a `regional_overview` seed like "music of Cape
-Verde" is now a real node with its own real parent chain (or a genuine root, if it has no `P279`/
-`P361` parent at all) rather than being dropped — so an item like "morna," whose only parent is
-that seed, keeps its real parent edge instead of being promoted to a synthetic root itself. Check
-`profile_hierarchy`'s "zero surviving rows in either output" count for how often the canonical
-vanishing still happens.
-
-**Data profile (as of this writing):**
-
-| Metric                                    | Canonical (`5_hierarchy`) | Regional (`5_regional_hierarchy`) |
-| ----------------------------------------- | ------------------------: | --------------------------------: |
-| Genre items in scope (distinct `item_id`) |                     2,961 |                             3,377 |
-| Final rows (= distinct `item_id`s)        |                     2,662 |                             3,377 |
-
-Genre items with zero surviving rows in _either_ output (the canonical-style silent vanish): **299**
-— all non-regional, i.e. every one is an "opera"-shaped item, not a regional one.
+An item with only one candidate parent (or none — a root) never produces a `5_secondary_parents`
+row.
 
 Regenerate with `uv run --package wikidata python -m wikidata.silver.profile` (reads
-`SILVER_OUTPUT_DIR/4_genre_parents.parquet`, `SILVER_OUTPUT_DIR/5_hierarchy.parquet`, and
-`SILVER_OUTPUT_DIR/5_regional_hierarchy.parquet`, read-only, no new data fetched) — these numbers
+`SILVER_OUTPUT_DIR/5_main_parent_selection.parquet` and `SILVER_OUTPUT_DIR/5_secondary_parents.parquet`,
+read-only, no new data fetched) — these numbers will drift as Wikidata's live genre tree changes.
+
+### 3.7 6_canonical_parents
+
+`6_canonical_parents.parquet`: `5_main_parent_selection.parquet` unchanged, plus one column flagging
+whether each row's (now single, main) `parent_id` is itself an actual musical style. See
+[DESIGN.md#25-6_canonical_parents](DESIGN.md#25-6_canonical_parents) for the classification rule.
+
+| Column              | Type  | Meaning                                                                                                                    |
+| ------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------- |
+| parent_is_canonical | bool? | Whether `parent_id` is `is_regional_overview = False` in `3_regional_overview_classification`; null for root rows (`parent_id` is null) |
+
+Regenerate with `uv run --package wikidata python -m wikidata.silver.profile` (reads
+`SILVER_OUTPUT_DIR/6_canonical_parents.parquet`, read-only, no new data fetched) — these numbers will
+drift as Wikidata's live genre tree changes.
+
+### 3.8 7_canonical_hierarchy
+
+`7_canonical_hierarchy.parquet`: reads `6_canonical_parents.parquet` and reduces it to one row per
+non-regional genre item, producing a clean, directly-consumable canonical genre hierarchy edge
+list — excluding every `is_regional = true` item (see
+[3.9 8_regional_hierarchy](#39-8_regional_hierarchy) for those). Since
+`5_main_parent_selection` already collapsed every item to a single parent edge upstream, this step
+only needs to prune to same-graph edges (dropping/promoting items whose sole parent points outside
+the canonical set) — no further multi-parent collapse happens here. See
+[DESIGN.md#26-7_canonical_hierarchy](DESIGN.md#26-7_canonical_hierarchy) for the pruning rule and
+the open "too many roots" exploration (the manual-CSV backstops that drop non-genre items entirely
+run earlier, in `2_non_genre_pruning` — see
+[DESIGN.md#21-2_non_genre_pruning](DESIGN.md#21-2_non_genre_pruning)).
+
+| Column        | Type | Meaning                                                                          |
+| ------------- | ---- | ---------------------------------------------------------------------------------- |
+| item_id       | str  | Wikidata QID of the genre (e.g. `Q11399`) — **unique in this table**             |
+| item_label    | str  | Same English/`mul`-fallback label as in `1_item_links` (see above), for `item_id`                                                      |
+| item_url      | str  | `https://www.wikidata.org/wiki/` + `item_id`                                     |
+| parent_id     | str? | QID of the single chosen parent, or null for a root                              |
+| parent_label  | str? | Same fallback as `item_label`, for `parent_id`, or null                                           |
+| parent_url    | str? | `https://www.wikidata.org/wiki/` + `parent_id`, or null for a root row           |
+| relation_type | str? | `"P279"`, `"P361"`, or `"manual_main_parent"` — which property/source produced this edge, or null for a root row |
+
+Genre items with zero surviving rows in _either_ this output or `8_regional_hierarchy` (the silent
+vanish) are all non-regional, i.e. every one is an "opera"-shaped item, not a regional one. See
+[DESIGN.md#262-known-consequence--non-genre-orphans-vanish](DESIGN.md#262-known-consequence--non-genre-orphans-vanish)
+for why.
+
+Regenerate with `uv run --package wikidata python -m wikidata.silver.profile` (reads
+`SILVER_OUTPUT_DIR/6_canonical_parents.parquet`, `SILVER_OUTPUT_DIR/7_canonical_hierarchy.parquet`, and
+`SILVER_OUTPUT_DIR/8_regional_hierarchy.parquet`, read-only, no new data fetched) — these numbers
 will drift as Wikidata's live genre tree changes.
 
-> ⚠️ **Under exploration:** `5_hierarchy` (canonical) surfaces a high number of root items
-> (`parent_id = null`) — hundreds, not the small handful a genre tree with one or two top-level
-> categories (e.g. "music") would suggest. Whether that many roots is a real property of the source
-> data (genuinely disconnected genre subtrees) or an artifact of upstream pruning/collapse rules
-> (e.g. stage 2's lowest-QID collapse severing an item from its more meaningful parent) is not yet
-> determined — see `pipelines/wikidata/notebooks/explore_genre_tree.ipynb` for the current
-> exploration of these roots' relevance.
->
-> **Ruled out:** `?item wdt:P279 wd:Q188451` (items directly subclass-of "music genre" itself,
-> rather than `P31`-instance-of it) was considered as an alternate, smaller root/seed list. Live
-> Wikidata returns only 12 items, not a clean top-level genre list — one is unrelated ("game
-> piece"), two are specific traditions rather than roots ("gharana", "palo"), and seven are
-> meta-classes describing a _category of genre_ (e.g. "jazz genre", "rock genre") rather than the
-> genre item itself (jazz music is the separate `P31` instance `Q1298934`, not this `P279`
-> subclass). No prior art found for using this pattern to seed a Wikidata music genre tree. Doesn't
-> resolve the root-count question above.
->
-> **Target shape (design intent, not yet reached):** the canonical tree should collapse down to a
-> handful of root genre families — rock, blues, jazz, funk/disco, electronic, hip-hop, reggae/dub,
-> classical music, etc. — not the hundreds of roots it currently produces. Getting there is expected
-> to be mostly a linking/cleaning problem (correcting mis-collapsed parent edges, e.g. the
-> multi-parent lowest-QID heuristic above) rather than a new extraction or classification mechanism.
-> `5_regional_hierarchy` follows different logic entirely and is **not** expected to converge to a
-> small root count: one root per cultural/geographic region (e.g. "music of Cape Verde"), with that
-> region's own genres nested underneath it.
+### 3.9 8_regional_hierarchy
+
+`8_regional_hierarchy.parquet`: mirrors `7_canonical_hierarchy`'s pruning, restricted to
+`is_regional = true` items (which now includes the `regional_overview` seed items themselves).
+Reads `6_canonical_parents.parquet` and reduces it to one row per regional genre item, producing a
+clean, directly-consumable regional genre hierarchy edge list. Same "no further multi-parent
+collapse needed" property as `7_canonical_hierarchy`, for the same reason. See
+[DESIGN.md#27-8_regional_hierarchy](DESIGN.md#27-8_regional_hierarchy) for the pruning rule.
+
+| Column        | Type | Meaning                                                                          |
+| ------------- | ---- | ---------------------------------------------------------------------------------- |
+| item_id       | str  | Wikidata QID of the genre (e.g. `Q1198360`) — **unique in this table**           |
+| item_label    | str  | Same English/`mul`-fallback label as in `1_item_links` (see above), for `item_id`                                                      |
+| item_url      | str  | `https://www.wikidata.org/wiki/` + `item_id`                                     |
+| parent_id     | str? | QID of the single chosen parent, or null for a root                              |
+| parent_label  | str? | Same fallback as `item_label`, for `parent_id`, or null                                           |
+| parent_url    | str? | `https://www.wikidata.org/wiki/` + `parent_id`, or null for a root row           |
+| relation_type | str? | `"P279"`, `"P361"`, or `"manual_main_parent"` — which property/source produced this edge, or null for a root row |
+
+Regenerate with `uv run --package wikidata python -m wikidata.silver.profile` (reads
+`SILVER_OUTPUT_DIR/6_canonical_parents.parquet`, `SILVER_OUTPUT_DIR/7_canonical_hierarchy.parquet`, and
+`SILVER_OUTPUT_DIR/8_regional_hierarchy.parquet`, read-only, no new data fetched) — these numbers
+will drift as Wikidata's live genre tree changes.
+
+### 3.10 9_canonical_roots
+
+`9_canonical_roots.parquet`: `7_canonical_hierarchy.parquet` filtered to root items (`parent_id`
+null, or pointing at a QID with no row of its own in that file — a dead-end parent) and reduced to
+the three item-identifying columns, sorted by `item_label`. Exists purely to make manual
+exploration of the "too many roots" open question
+([DESIGN.md#263-under-exploration--root-count](DESIGN.md#263-under-exploration--root-count)) easier — a ready-to-open list of exactly the
+items in question, instead of re-deriving the filter each time (as
+`notebooks/explore_genre_tree.ipynb` currently does inline). Not consumed by any later step and not
+itself part of the pruning chain — it's a read view of `7_canonical_hierarchy`, not new information.
+
+| Column     | Type | Meaning                                       |
+| ---------- | ---- | ---------------------------------------------- |
+| item_id    | str  | Wikidata QID of the root genre (e.g. `Q11399`) |
+| item_label | str  | English label for `item_id`                    |
+| item_url   | str  | `https://www.wikidata.org/wiki/` + `item_id`   |
+
+See [DESIGN.md#263-under-exploration--root-count](DESIGN.md#263-under-exploration--root-count) for
+context on why this count is expected to shrink as the lowest-QID main-parent heuristic and
+regional classification rules mature.

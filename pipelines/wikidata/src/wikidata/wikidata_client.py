@@ -1,4 +1,5 @@
 import json
+from collections.abc import Sequence
 
 import httpx
 import tenacity
@@ -7,6 +8,20 @@ SPARQL_ENDPOINT = "https://query.wikidata.org/sparql"
 USER_AGENT = "the-music-tree-pipelines (https://github.com/BehindTheMusicTree/the-music-tree-pipelines)"
 
 MUSIC_GENRE_QID = "Q188451"
+INDIGENOUS_TO_PID = "P2341"
+COUNTRY_OF_ORIGIN_PID = "P495"
+
+# Label service fallback chain: tries each language in order, falling back to the
+# next when an item has no label in the previous one, before finally falling back
+# to printing the QID (see silver/item_links.py's has_item_label/has_parent_label).
+# "mul" = Wikidata's language-independent label (e.g. band/artist names); the rest
+# are the languages most likely to carry a label for regional/national genres that
+# lack an English one.
+LABEL_LANGUAGES = "en,mul,es,fr,de,pt,it,nl,ru,ja,zh"
+
+GENRE_TREE_QUERY_VARIABLES = ("item", "itemLabel", "parent", "parentLabel", "relation")
+INDIGENOUS_TO_QUERY_VARIABLES = ("item", "indigenousTo", "indigenousToLabel")
+COUNTRY_OF_ORIGIN_QUERY_VARIABLES = ("item", "countryOfOrigin", "countryOfOriginLabel")
 
 # P31 = "instance of": class membership, identifies what an item *is*
 # (e.g. "rock music" P31 "music genre" — this is how we find the full set of genre items).
@@ -24,7 +39,7 @@ MUSIC_GENRE_QID = "Q188451"
 # P279/P361 edges to find its parent(s) — never P31 for the parent edges, and never
 # a P279 walk to find the genre set (a direct P279 query against "music genre"
 # itself finds only 12 items, mostly meta-categories like "rock genre" rather
-# than real genres — see SCHEMA.md).
+# than real genres — see DESIGN.md#1-bronze).
 #
 # For each genre, we ingest its direct P279 ("subclass of") and P361 ("part of")
 # parent(s), tagging each edge with ?relation so the two relationship types
@@ -54,18 +69,55 @@ SELECT ?item ?itemLabel ?parent ?parentLabel ?relation WHERE {{
     FILTER NOT EXISTS {{ ?item wdt:P279 ?p279Parent }}
     FILTER NOT EXISTS {{ ?item wdt:P361 ?p361Parent }}
   }}
-  SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en". }}
+  SERVICE wikibase:label {{ bd:serviceParam wikibase:language "{LABEL_LANGUAGES}". }}
+}}
+"""
+
+# P2341 = "indigenous to": links an item to the people/ethnic group it originates from
+# (e.g. "Han Chinese music" P2341 "Han Chinese people"). This is a per-item ethnographic
+# attribute, not a genre-to-genre taxonomy edge like P279/P361, and its cardinality is
+# independent of a genre's parent count — an item can have any number of P279/P361 parents
+# and, separately, any number of P2341 values. Querying both in a single row (as
+# GENRE_TREE_QUERY does for P279/P361, which share the same "parent edge" semantics) would
+# cross-multiply the two OPTIONALs into spurious combinations, so this is a separate query
+# producing a separate (item, indigenous_to) table — see ingest.ingest_indigenous_to.
+#
+# Only items missing a P2341 value are absent from the result; an item with several values
+# produces one row per value.
+INDIGENOUS_TO_QUERY = f"""
+SELECT ?item ?indigenousTo ?indigenousToLabel WHERE {{
+  ?item wdt:P31 wd:{MUSIC_GENRE_QID} ;
+        wdt:{INDIGENOUS_TO_PID} ?indigenousTo .
+  SERVICE wikibase:label {{ bd:serviceParam wikibase:language "{LABEL_LANGUAGES}". }}
+}}
+"""
+
+# P495 = "country of origin": links a creative work/genre to the country it originated in
+# (e.g. "fado" P495 "Portugal"). Like P2341, this is a per-item attribute, not a genre-to-genre
+# taxonomy edge, and its cardinality is independent of an item's P279/P361 parent count, so it's
+# queried and ingested separately from GENRE_TREE_QUERY for the same cross-multiplication reason
+# documented above INDIGENOUS_TO_QUERY — see ingest.ingest_country_of_origin.
+#
+# Only items missing a P495 value are absent from the result; an item with several values
+# produces one row per value.
+COUNTRY_OF_ORIGIN_QUERY = f"""
+SELECT ?item ?countryOfOrigin ?countryOfOriginLabel WHERE {{
+  ?item wdt:P31 wd:{MUSIC_GENRE_QID} ;
+        wdt:{COUNTRY_OF_ORIGIN_PID} ?countryOfOrigin .
+  SERVICE wikibase:label {{ bd:serviceParam wikibase:language "{LABEL_LANGUAGES}". }}
 }}
 """
 
 
 @tenacity.retry(
     retry=tenacity.retry_if_exception_type((httpx.TransportError, httpx.HTTPStatusError, json.JSONDecodeError)),
-    wait=tenacity.wait_exponential(multiplier=1, max=10),
-    stop=tenacity.stop_after_attempt(3),
+    wait=tenacity.wait_exponential(multiplier=1, max=30),
+    stop=tenacity.stop_after_attempt(5),
     reraise=True,
 )
-def run_query(query: str, timeout: float = 60.0) -> list[dict[str, str | None]]:
+def run_query(
+    query: str, variables: Sequence[str] = GENRE_TREE_QUERY_VARIABLES, timeout: float = 60.0
+) -> list[dict[str, str | None]]:
     response = httpx.get(
         SPARQL_ENDPOINT,
         params={"query": query},
@@ -74,7 +126,4 @@ def run_query(query: str, timeout: float = 60.0) -> list[dict[str, str | None]]:
     )
     response.raise_for_status()
     bindings = response.json()["results"]["bindings"]
-    return [
-        {key: binding.get(key, {}).get("value") for key in ("item", "itemLabel", "parent", "parentLabel", "relation")}
-        for binding in bindings
-    ]
+    return [{key: binding.get(key, {}).get("value") for key in variables} for binding in bindings]

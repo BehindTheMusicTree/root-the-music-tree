@@ -1,0 +1,10 @@
+item_id,item_label,reason
+LOCAL:ska-reggae-dub,Ska/Reggae/Dub,"synthetic canonical grouping node (no single Wikidata item spans ska, reggae, and dub); reggae itself has a genuine P279 edge to ""music of Jamaica"" so is otherwise automatically is_regional, see manual_main_parent.csv exclude_other_parents; ska added per user request (chronologically first, sharing the same offbeat ""skank"" rhythmic tradition)"
+LOCAL:disco-funk,Disco/Funk,"synthetic canonical grouping node (no single Wikidata item spans both disco and funk); disco has a genuine P361 edge to ""African-American music"" so is otherwise automatically is_regional via inheritance, see manual_main_parent.csv exclude_other_parents; user-requested regrouping"
+LOCAL:blues-rock,Blues/Rock,"synthetic canonical grouping node (no single Wikidata item spans both blues and rock); blues has a genuine P279 edge to ""music of North America"" so is otherwise automatically is_regional (direct), see manual_main_parent.csv exclude_other_parents; user-requested regrouping"
+LOCAL:pop-electronic,Pop electronic,synthetic canonical grouping node for electronic music (Q9778) subgenres with pop/dance/rock crossover appeal; user-requested regrouping
+LOCAL:core-electronic,Core electronic,synthetic canonical grouping node for electronic music (Q9778) subgenres not routed to Pop electronic; user-requested regrouping
+LOCAL:pop-hip-hop,Pop hip-hop,synthetic canonical grouping node for hip-hop (Q11401) subgenres with mainstream/pop/dance crossover appeal; user-requested regrouping
+LOCAL:core-hip-hop,Core hip-hop,synthetic canonical grouping node for hip-hop (Q11401) subgenres not routed to Pop hip-hop; user-requested regrouping
+LOCAL:pop-funk,Pop funk,synthetic canonical grouping node under LOCAL:disco-funk for funk (Q164444) subgenres with pop/dance/electronic crossover appeal; user-requested regrouping
+LOCAL:core-funk,Core funk,synthetic canonical grouping node under LOCAL:disco-funk anchoring funk (Q164444) and its remaining traditional subgenres; user-requested regrouping

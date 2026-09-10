@@ -2,7 +2,7 @@
 
 Not a scheduled/systemd job — run manually whenever the example song set needs refreshing,
 then copy the resulting file into the downstream API repo next to its `genre_example_tree.json`
-fixture (see `pipelines/musicbrainz/SCHEMA.md#silver`). Requires `musicbrainz.silver` to have
+fixture (see `pipelines/musicbrainz/SCHEMA.md#2-silver`). Requires `musicbrainz.silver` to have
 already been run (reads `SILVER_OUTPUT_DIR/3_song_example.parquet`).
 
 Usage:

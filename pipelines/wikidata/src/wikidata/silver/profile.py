@@ -21,6 +21,13 @@ def profile_item_links(silver_path: Path) -> None:
     print(f"sample item_url: {df.select('item_url').row(0)[0]}")
 
 
+def profile_non_genre_pruning(silver_path: Path) -> None:
+    df = pl.read_parquet(silver_path)
+
+    print()
+    print(f"rows: {df.height} ({df.select('item_id').n_unique()} distinct items)")
+
+
 def profile_regional_overview_classification(silver_path: Path) -> None:
     df = pl.read_parquet(silver_path)
     genre = df.filter(~pl.col("is_regional_overview"))
@@ -46,18 +53,20 @@ def profile_regional_classification(silver_path: Path) -> None:
     print(items.group_by("regional_reason").len().sort("len", descending=True))
 
 
-def profile_genre_parents(silver_path: Path) -> None:
+def profile_canonical_parents(silver_path: Path) -> None:
     df = pl.read_parquet(silver_path)
 
     print()
     print(f"rows: {df.height} ({df.select('item_id').n_unique()} distinct items)")
-    print("by parent_is_genre (rows, null = root item with no parent):")
-    print(df.group_by("parent_is_genre").len().sort("len", descending=True))
+    print("by parent_is_canonical (rows, null = root item with no parent):")
+    print(df.group_by("parent_is_canonical").len().sort("len", descending=True))
 
 
-def profile_hierarchy(genre_parents_path: Path, hierarchy_path: Path, regional_hierarchy_path: Path) -> None:
-    parents_df = pl.read_parquet(genre_parents_path)
-    hierarchy_df = pl.read_parquet(hierarchy_path)
+def profile_hierarchy(
+    canonical_parents_path: Path, canonical_hierarchy_path: Path, regional_hierarchy_path: Path
+) -> None:
+    parents_df = pl.read_parquet(canonical_parents_path)
+    hierarchy_df = pl.read_parquet(canonical_hierarchy_path)
     regional_hierarchy_df = pl.read_parquet(regional_hierarchy_path)
 
     genre_items = parents_df.filter(~pl.col("is_regional_overview")).select("item_id").unique()
@@ -76,11 +85,12 @@ if __name__ == "__main__":
     load_pipeline_env(wikidata.__file__)
     silver_dir = resolve_pipeline_path(wikidata.__file__, require_env("SILVER_OUTPUT_DIR"))
     profile_item_links(silver_dir / "1_item_links.parquet")
-    profile_regional_overview_classification(silver_dir / "2_regional_overview_classification.parquet")
-    profile_regional_classification(silver_dir / "3_regional_classification.parquet")
-    profile_genre_parents(silver_dir / "4_genre_parents.parquet")
+    profile_non_genre_pruning(silver_dir / "2_non_genre_pruning.parquet")
+    profile_regional_overview_classification(silver_dir / "3_regional_overview_classification.parquet")
+    profile_regional_classification(silver_dir / "4_regional_classification.parquet")
+    profile_canonical_parents(silver_dir / "5_canonical_parents.parquet")
     profile_hierarchy(
-        silver_dir / "4_genre_parents.parquet",
-        silver_dir / "5_hierarchy.parquet",
-        silver_dir / "5_regional_hierarchy.parquet",
+        silver_dir / "5_canonical_parents.parquet",
+        silver_dir / "6_canonical_hierarchy.parquet",
+        silver_dir / "7_regional_hierarchy.parquet",
     )

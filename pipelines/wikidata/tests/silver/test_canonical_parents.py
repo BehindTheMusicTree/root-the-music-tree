@@ -2,7 +2,7 @@ from pathlib import Path
 
 import polars as pl
 
-from wikidata.silver import genre_parents as sg
+from wikidata.silver import canonical_parents as sg
 
 REGIONAL_CLASSIFICATION_ROWS = [
     # rock music -> popular music: popular music is a real genre (is_regional_overview=False)
@@ -17,6 +17,7 @@ REGIONAL_CLASSIFICATION_ROWS = [
         "classification_reason": None,
         "is_regional": False,
         "regional_reason": None,
+        "relation_type": "P279",
     },
     # popular music: root item, no parent
     {
@@ -30,6 +31,7 @@ REGIONAL_CLASSIFICATION_ROWS = [
         "classification_reason": None,
         "is_regional": False,
         "regional_reason": None,
+        "relation_type": None,
     },
     # opera -> composed musical work: parent isn't in the genre extension at all
     {
@@ -43,6 +45,7 @@ REGIONAL_CLASSIFICATION_ROWS = [
         "classification_reason": None,
         "is_regional": False,
         "regional_reason": None,
+        "relation_type": "P279",
     },
     # some subgenre -> music of Kenya: parent is in the genre extension but tagged non-genre
     {
@@ -56,6 +59,7 @@ REGIONAL_CLASSIFICATION_ROWS = [
         "classification_reason": None,
         "is_regional": True,
         "regional_reason": "direct",
+        "relation_type": "P279",
     },
     {
         "item_id": "Q3868594",
@@ -68,25 +72,28 @@ REGIONAL_CLASSIFICATION_ROWS = [
         "classification_reason": "regional_overview",
         "is_regional": True,
         "regional_reason": "seed",
+        "relation_type": None,
     },
 ]
 
 
-def _write_regional_classification(tmp_path: Path) -> Path:
-    regional_classification_path = tmp_path / "3_regional_classification.parquet"
-    pl.DataFrame(REGIONAL_CLASSIFICATION_ROWS).write_parquet(regional_classification_path)
-    return regional_classification_path
+def _write_main_parent_selection(tmp_path: Path) -> Path:
+    main_parent_selection_path = tmp_path / "5_main_parent_selection.parquet"
+    pl.DataFrame(REGIONAL_CLASSIFICATION_ROWS).write_parquet(main_parent_selection_path)
+    return main_parent_selection_path
 
 
-def test_flag_genre_parents_marks_parent_status(tmp_path: Path) -> None:
-    regional_classification_path = _write_regional_classification(tmp_path)
+def test_flag_canonical_parents_marks_parent_status(tmp_path: Path) -> None:
+    main_parent_selection_path = _write_main_parent_selection(tmp_path)
     output_dir = tmp_path / "silver"
 
-    result = sg.flag_genre_parents(regional_classification_path, output_dir)
+    result = sg.flag_canonical_parents(main_parent_selection_path, output_dir)
 
-    assert result == output_dir / "4_genre_parents.parquet"
-    parent_is_genre_by_item = {row["item_id"]: row["parent_is_genre"] for row in pl.read_parquet(result).to_dicts()}
-    assert parent_is_genre_by_item == {
+    assert result == output_dir / "6_canonical_parents.parquet"
+    parent_is_canonical_by_item = {
+        row["item_id"]: row["parent_is_canonical"] for row in pl.read_parquet(result).to_dicts()
+    }
+    assert parent_is_canonical_by_item == {
         "Q11399": True,  # parent (popular music) is_regional_overview=False
         "Q9778": None,  # root item, no parent
         "Q1344": False,  # parent not in the genre extension at all
@@ -95,10 +102,10 @@ def test_flag_genre_parents_marks_parent_status(tmp_path: Path) -> None:
     }
 
 
-def test_flag_genre_parents_creates_output_dir(tmp_path: Path) -> None:
-    regional_classification_path = _write_regional_classification(tmp_path)
+def test_flag_canonical_parents_creates_output_dir(tmp_path: Path) -> None:
+    main_parent_selection_path = _write_main_parent_selection(tmp_path)
     output_dir = tmp_path / "does" / "not" / "exist"
 
-    sg.flag_genre_parents(regional_classification_path, output_dir)
+    sg.flag_canonical_parents(main_parent_selection_path, output_dir)
 
     assert output_dir.is_dir()
