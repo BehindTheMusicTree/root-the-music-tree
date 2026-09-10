@@ -27,6 +27,13 @@ def _write_manual_out_of_scope_genres(tmp_path: Path, rows: list[dict] | None = 
     return path
 
 
+def _write_manual_umbrella_canonical_genres(tmp_path: Path, rows: list[dict] | None = None) -> Path:
+    path = tmp_path / "manual_umbrella_canonical_genres.csv"
+    schema = {"item_id": pl.Utf8, "item_label": pl.Utf8, "reason": pl.Utf8}
+    pl.DataFrame(rows or [], schema=schema).write_csv(path)
+    return path
+
+
 def _write_genre_classification(tmp_path: Path) -> Path:
     genre_classification_path = tmp_path / "1_item_links.parquet"
     pl.DataFrame(
@@ -79,15 +86,18 @@ def _prune_non_genre_items(
     theme_rows: list[dict] | None = None,
     technique_rows: list[dict] | None = None,
     out_of_scope_rows: list[dict] | None = None,
+    umbrella_rows: list[dict] | None = None,
 ) -> Path:
     manual_theme_genres_path = _write_manual_theme_genres(tmp_path, theme_rows)
     manual_technique_genres_path = _write_manual_technique_genres(tmp_path, technique_rows)
     manual_out_of_scope_genres_path = _write_manual_out_of_scope_genres(tmp_path, out_of_scope_rows)
+    manual_umbrella_canonical_genres_path = _write_manual_umbrella_canonical_genres(tmp_path, umbrella_rows)
     return ngp.prune_non_genre_items(
         genre_classification_path,
         manual_theme_genres_path,
         manual_technique_genres_path,
         manual_out_of_scope_genres_path,
+        manual_umbrella_canonical_genres_path,
         output_dir,
     )
 
@@ -137,6 +147,50 @@ def test_prune_non_genre_items_drops_out_of_scope_items(tmp_path: Path) -> None:
 
     df = pl.read_parquet(result)
     assert "Q2" not in set(df.select("item_id").unique().to_series())
+
+
+def test_prune_non_genre_items_drops_umbrella_canonical_items(tmp_path: Path) -> None:
+    genre_classification_path = _write_genre_classification(tmp_path)
+    output_dir = tmp_path / "silver"
+
+    result = _prune_non_genre_items(
+        tmp_path,
+        genre_classification_path,
+        output_dir,
+        umbrella_rows=[{"item_id": "Q2", "item_label": "mistagged item", "reason": "test"}],
+    )
+
+    df = pl.read_parquet(result)
+    assert "Q2" not in set(df.select("item_id").unique().to_series())
+
+
+def test_prune_non_genre_items_raises_on_unknown_umbrella_item_id(tmp_path: Path) -> None:
+    genre_classification_path = _write_genre_classification(tmp_path)
+    output_dir = tmp_path / "silver"
+
+    with pytest.raises(ValueError, match="Q0000000"):
+        _prune_non_genre_items(
+            tmp_path,
+            genre_classification_path,
+            output_dir,
+            umbrella_rows=[{"item_id": "Q0000000", "item_label": "not in the tree", "reason": "test"}],
+        )
+
+
+def test_prune_non_genre_items_raises_on_duplicate_umbrella_item_id(tmp_path: Path) -> None:
+    genre_classification_path = _write_genre_classification(tmp_path)
+    output_dir = tmp_path / "silver"
+
+    with pytest.raises(ValueError, match="duplicate"):
+        _prune_non_genre_items(
+            tmp_path,
+            genre_classification_path,
+            output_dir,
+            umbrella_rows=[
+                {"item_id": "Q9778", "item_label": "popular music", "reason": "test"},
+                {"item_id": "Q9778", "item_label": "popular music", "reason": "test duplicate"},
+            ],
+        )
 
 
 def test_prune_non_genre_items_raises_on_unknown_theme_item_id(tmp_path: Path) -> None:

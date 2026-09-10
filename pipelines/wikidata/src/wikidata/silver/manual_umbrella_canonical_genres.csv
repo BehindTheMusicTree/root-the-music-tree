@@ -1,0 +1,7 @@
+item_id,item_label,reason
+Q1695023,alternative music,"overly broad umbrella genre spanning countless pop/rock-deviating subgenres, not a useful canonical grouping"
+Q373342,popular music,"overly broad umbrella spanning rock, jazz, hip-hop, funk, ska, world music etc. as direct children; excluding it lets those families surface as their own canonical roots instead of collapsing under one umbrella node"
+Q3570024,ethnic music,"overly broad umbrella spanning countless national/ethnic genres as direct children, not a useful canonical grouping"
+Q18345375,Latin music,"overly broad pan-national umbrella spanning countless Latin American/Iberian genres, not a useful canonical grouping"
+Q2719078,Western music,"overly broad umbrella spanning nearly all Western musical styles, not a useful canonical grouping"
+Q6024704,indigenous music,"overly broad umbrella spanning countless indigenous genres worldwide, not a useful canonical grouping"

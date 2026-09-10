@@ -120,9 +120,9 @@ downstream.
 
 ### 2.1 2_non_genre_pruning
 
-Three git-tracked, hand-curated CSVs (same columns: `item_id`, `item_label`, `reason`) each list
+Four git-tracked, hand-curated CSVs (same columns: `item_id`, `item_label`, `reason`) each list
 items that no automated signal distinguishes from a real genre, so a data expert reviewing the
-root lists adds them by hand. Every `item_id` across all three is dropped from the genre tree
+root lists adds them by hand. Every `item_id` across all four is dropped from the genre tree
 entirely (unknown `item_id`s raise), right after `1_item_links` and before any other classification
 step runs — so a dropped item can never sit on a cascade path and hand its `is_regional` status
 down to a real genre beneath it, and can never survive as a dangling parent for
@@ -136,6 +136,12 @@ down to a real genre beneath it, and can never survive as a dangling parent for
   "music genre" classification was simply wrong (e.g. a near-empty stub with no real description,
   a record label, an event, a person) — as opposed to a real but off-topic genre
   (`manual_theme_genres.csv`) or a technique (`manual_technique_genres.csv`).
+- `manual_umbrella_canonical_genres.csv` — genuine music genres, correctly classified, but too
+  broad to serve as a useful canonical grouping node (e.g. "alternative music", spanning countless
+  pop/rock-deviating subgenres with no single coherent style) — as opposed to a misclassification
+  (`manual_out_of_scope_genres.csv`), an off-topic theme (`manual_theme_genres.csv`), or a
+  technique (`manual_technique_genres.csv`). Dropping it lets its children (or the item itself, if
+  parentless) surface as their own canonical roots instead of collapsing under one umbrella node.
 
 This runs as the very first classification step, before `3_regional_overview_classification` and
 `4_regional_classification`, because none of this is about region — it's non-genre pruning, and
