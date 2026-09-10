@@ -686,3 +686,140 @@ def test_classify_regional_genres_raises_on_duplicate_parent_override_item_id(tm
             output_dir,
             manual_main_parent_path,
         )
+
+
+def test_add_manual_canonical_parent_items_adds_synthetic_node() -> None:
+    df = pl.DataFrame(GENRE_CLASSIFICATION_ROWS)
+    manual_additions = pl.DataFrame(
+        {"item_id": ["LOCAL:reggae-dub"], "item_label": ["Reggae/Dub"], "reason": ["synthetic grouping node"]}
+    )
+
+    result = sr._add_manual_canonical_parent_items(df, manual_additions)
+
+    added_row = result.filter(pl.col("item_id") == "LOCAL:reggae-dub").row(0, named=True)
+    assert added_row["item_label"] == "Reggae/Dub"
+    assert added_row["parent_id"] is None
+    assert added_row["item_url"] == "https://www.wikidata.org/wiki/LOCAL:reggae-dub"
+    assert added_row["is_regional_overview"] is False
+    assert added_row["classification_reason"] == "manual_canonical_parent_addition"
+    assert result.height == df.height + 1
+
+
+def test_add_manual_canonical_parent_items_no_op_on_empty_additions() -> None:
+    df = pl.DataFrame(GENRE_CLASSIFICATION_ROWS)
+
+    result = sr._add_manual_canonical_parent_items(df, pl.DataFrame(schema=df.schema).select("item_id", "item_label"))
+
+    assert result.equals(df)
+
+
+def test_add_manual_canonical_parent_items_raises_on_blank_item_label() -> None:
+    df = pl.DataFrame(GENRE_CLASSIFICATION_ROWS)
+    manual_additions = pl.DataFrame({"item_id": ["LOCAL:reggae-dub"], "item_label": [""], "reason": ["test"]})
+
+    with pytest.raises(ValueError, match="blank item_id or item_label"):
+        sr._add_manual_canonical_parent_items(df, manual_additions)
+
+
+def test_add_manual_canonical_parent_items_raises_on_non_local_prefix() -> None:
+    df = pl.DataFrame(GENRE_CLASSIFICATION_ROWS)
+    manual_additions = pl.DataFrame({"item_id": ["Q999999999"], "item_label": ["fabricated genre"], "reason": ["test"]})
+
+    with pytest.raises(ValueError, match="LOCAL:"):
+        sr._add_manual_canonical_parent_items(df, manual_additions)
+
+
+def test_add_manual_canonical_parent_items_raises_on_duplicate_item_id() -> None:
+    df = pl.DataFrame(GENRE_CLASSIFICATION_ROWS)
+    manual_additions = pl.DataFrame(
+        {
+            "item_id": ["LOCAL:reggae-dub", "LOCAL:reggae-dub"],
+            "item_label": ["Reggae/Dub", "Reggae/Dub again"],
+            "reason": ["test", "test duplicate"],
+        }
+    )
+
+    with pytest.raises(ValueError, match="duplicate"):
+        sr._add_manual_canonical_parent_items(df, manual_additions)
+
+
+def test_add_manual_canonical_parent_items_raises_on_item_id_already_present() -> None:
+    df = pl.DataFrame(GENRE_CLASSIFICATION_ROWS).with_columns(
+        item_id=pl.when(pl.col("item_id") == "Q8341").then(pl.lit("LOCAL:reggae-dub")).otherwise(pl.col("item_id"))
+    )
+    manual_additions = pl.DataFrame({"item_id": ["LOCAL:reggae-dub"], "item_label": ["Reggae/Dub"], "reason": ["test"]})
+
+    with pytest.raises(ValueError, match="already present"):
+        sr._add_manual_canonical_parent_items(df, manual_additions)
+
+
+def test_classify_regional_genres_exclude_other_parents_drops_conflicting_regional_edge(tmp_path: Path) -> None:
+    # fado has a genuine parent edge into Portuguese folk music (regional, via the seed). Overriding
+    # fado's main parent to jazz (canonical) with exclude_other_parents=true must drop that other
+    # edge too, not just the null-parent placeholder — otherwise the regional cascade would still see
+    # the Portuguese-folk-music edge and keep fado is_regional=True regardless of the override.
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
+    indigenous_to_path = _write_indigenous_to(tmp_path)
+    manual_overrides_path = _write_manual_overrides(tmp_path)
+    manual_main_parent_path = tmp_path / "manual_main_parent.csv"
+    pl.DataFrame(
+        {
+            "item_id": ["Q185676"],  # fado, already has a parent edge to Portuguese folk music
+            "item_label": ["fado"],
+            "reason": ["test"],
+            "parent_item_id": ["Q8341"],  # jazz, canonical
+            "exclude_other_parents": ["true"],
+        }
+    ).write_csv(manual_main_parent_path)
+    output_dir = tmp_path / "silver"
+
+    result = _classify_regional_genres(
+        regional_overview_classification_path,
+        indigenous_to_path,
+        manual_overrides_path,
+        output_dir,
+        manual_main_parent_path,
+    )
+
+    df = pl.read_parquet(result)
+    fado_rows = df.filter(pl.col("item_id") == "Q185676")
+    parent_ids = set(fado_rows.select("parent_id").to_series().to_list())
+    assert parent_ids == {"Q8341"}
+    override_row = fado_rows.row(0, named=True)
+    assert override_row["relation_type"] == "manual_main_parent"
+    assert not override_row["is_regional"]
+    assert override_row["regional_reason"] is None
+
+
+def test_classify_regional_genres_exclude_other_parents_false_keeps_other_edges(tmp_path: Path) -> None:
+    # Same override as above but exclude_other_parents left blank/false: the other parent edge into
+    # Portuguese folk music must survive, same as the existing default-behavior test, so fado stays
+    # is_regional=True via the surviving edge into the regional seed.
+    regional_overview_classification_path = _write_genre_classification(tmp_path)
+    indigenous_to_path = _write_indigenous_to(tmp_path)
+    manual_overrides_path = _write_manual_overrides(tmp_path)
+    manual_main_parent_path = tmp_path / "manual_main_parent.csv"
+    pl.DataFrame(
+        {
+            "item_id": ["Q185676"],
+            "item_label": ["fado"],
+            "reason": ["test"],
+            "parent_item_id": ["Q8341"],
+            "exclude_other_parents": [""],
+        }
+    ).write_csv(manual_main_parent_path)
+    output_dir = tmp_path / "silver"
+
+    result = _classify_regional_genres(
+        regional_overview_classification_path,
+        indigenous_to_path,
+        manual_overrides_path,
+        output_dir,
+        manual_main_parent_path,
+    )
+
+    df = pl.read_parquet(result)
+    fado_rows = df.filter(pl.col("item_id") == "Q185676")
+    parent_ids = set(fado_rows.select("parent_id").to_series().to_list())
+    assert parent_ids == {"Q106556293", "Q8341"}
+    assert fado_rows.filter(pl.col("parent_id") == "Q106556293").row(0, named=True)["is_regional"]
