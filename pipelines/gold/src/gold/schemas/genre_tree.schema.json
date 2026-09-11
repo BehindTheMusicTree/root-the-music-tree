@@ -16,6 +16,7 @@
       "type": "object",
       "properties": {
         "name": { "type": "string", "minLength": 1 },
+        "side": { "type": "string", "enum": ["pop"] },
         "children": {
           "type": "array",
           "items": { "$ref": "#/$defs/node" }

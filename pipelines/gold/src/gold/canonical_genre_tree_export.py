@@ -9,14 +9,76 @@ from gold.genre_tree_builder import build_genre_tree
 
 GENRE_TREE_SCHEMA_PATH = Path(__file__).parent / "schemas" / "genre_tree.schema.json"
 
+# Committed alongside the code (not a gitignored gold output): a data expert's curated pick of which
+# direct child of each canonical root is the-music-tree-genre-kit's "pop" side (crossover/mainstream
+# branch, e.g. Electropop under Electronic) — everything else defaults to "core". Wikidata has no
+# notion of this distinction, so it can't be derived automatically.
+MANUAL_CANONICAL_GENRE_POP_SIDE_PATH = Path(__file__).parent / "manual_canonical_genre_pop_side.csv"
+
 logger = logging.getLogger(__name__)
 
 
-def export_canonical_genre_tree(wikidata_silver_dir: Path, output_dir: Path) -> Path:
+def _blank_mask(df: pl.DataFrame, column: str) -> pl.Expr:
+    return pl.col(column).is_null() | (pl.col(column).str.strip_chars() == "")
+
+
+def _load_pop_sides(manual_canonical_genre_pop_side_path: Path, hierarchy: pl.DataFrame) -> dict[str, set[str]]:
+    df = pl.read_csv(manual_canonical_genre_pop_side_path)
+    csv_name = manual_canonical_genre_pop_side_path.name
+
+    for column in ("root_genre_name", "pop_child_genre_name", "reason"):
+        if not df.filter(_blank_mask(df, column)).is_empty():
+            raise ValueError(f"{csv_name} has row(s) with a null/blank '{column}'")
+
+    rows = df.select("root_genre_name", "pop_child_genre_name").rows()
+    if len(rows) != len(set(rows)):
+        raise ValueError(f"{csv_name} has duplicate (root_genre_name, pop_child_genre_name) row(s)")
+
+    roots = df.select("root_genre_name").to_series().to_list()
+
+    known_item_ids = set(hierarchy.select("item_id").unique().to_series().to_list())
+    root_rows = hierarchy.filter(pl.col("parent_id").is_null() | ~pl.col("parent_id").is_in(known_item_ids))
+    root_id_by_label = dict(root_rows.select("item_label", "item_id").unique(subset="item_label").iter_rows())
+
+    unknown_roots = sorted(set(roots) - set(root_id_by_label))
+    if unknown_roots:
+        raise ValueError(f"{csv_name} references root_genre_name(s) not found among canonical roots: {unknown_roots}")
+
+    pop_sides: dict[str, set[str]] = {}
+    for row in df.iter_rows(named=True):
+        root_label, child_label = row["root_genre_name"], row["pop_child_genre_name"]
+        direct_children = set(
+            hierarchy.filter(pl.col("parent_id") == root_id_by_label[root_label]).select("item_label").to_series()
+        )
+        if child_label not in direct_children:
+            raise ValueError(
+                f"{csv_name}: pop_child_genre_name '{child_label}' is not a direct child of root '{root_label}'"
+            )
+        pop_sides.setdefault(root_label, set()).add(child_label)
+
+    for root_label, pop_children in pop_sides.items():
+        direct_children = set(
+            hierarchy.filter(pl.col("parent_id") == root_id_by_label[root_label]).select("item_label").to_series()
+        )
+        if pop_children >= direct_children:
+            raise ValueError(
+                f"{csv_name}: root '{root_label}' has no core (non-pop) child left — "
+                f"all {len(direct_children)} direct child(ren) marked pop"
+            )
+
+    return pop_sides
+
+
+def export_canonical_genre_tree(
+    wikidata_silver_dir: Path,
+    output_dir: Path,
+    manual_canonical_genre_pop_side_path: Path = MANUAL_CANONICAL_GENRE_POP_SIDE_PATH,
+) -> Path:
     hierarchy_path = wikidata_silver_dir / "7_canonical_hierarchy.parquet"
     logger.info("building canonical genre tree from %s", hierarchy_path)
     hierarchy = pl.read_parquet(hierarchy_path)
-    tree = build_genre_tree(hierarchy)
+    pop_sides = _load_pop_sides(manual_canonical_genre_pop_side_path, hierarchy)
+    tree = build_genre_tree(hierarchy, pop_sides)
 
     schema = json.loads(GENRE_TREE_SCHEMA_PATH.read_text())
     try:
