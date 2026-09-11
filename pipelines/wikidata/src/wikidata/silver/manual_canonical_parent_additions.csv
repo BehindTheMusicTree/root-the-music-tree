@@ -9,3 +9,5 @@ LOCAL:pop-hip-hop,Pop hip-hop,synthetic canonical grouping node for hip-hop (Q11
 LOCAL:core-hip-hop,Core hip-hop,synthetic canonical grouping node for hip-hop (Q11401) subgenres not routed to Pop hip-hop; user-requested regrouping
 LOCAL:pop-funk,Pop funk,synthetic canonical grouping node under LOCAL:disco-funk for funk (Q164444) subgenres with pop/dance/electronic crossover appeal; user-requested regrouping
 LOCAL:core-funk,Core funk,synthetic canonical grouping node under LOCAL:disco-funk anchoring funk (Q164444) and its remaining traditional subgenres; user-requested regrouping
+LOCAL:pop-jazz,Pop jazz,synthetic canonical grouping node for jazz (Q8341) subgenres with pop/mainstream crossover appeal; user-requested regrouping
+LOCAL:core-jazz,Core jazz,synthetic canonical grouping node for jazz (Q8341) subgenres not routed to Pop jazz; user-requested regrouping
