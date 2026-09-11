@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/BehindTheMusicTree/the-music-tree-pipelines/gold/genre_tree.schema.json",
-  "title": "Canonical genre tree export",
+  "title": "Genre tree export",
   "type": "object",
   "properties": {
     "tree": {
@@ -16,6 +16,7 @@
       "type": "object",
       "properties": {
         "name": { "type": "string", "minLength": 1 },
+        "side": { "type": "string", "enum": ["pop"] },
         "children": {
           "type": "array",
           "items": { "$ref": "#/$defs/node" }

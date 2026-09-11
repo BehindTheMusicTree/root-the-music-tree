@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - [Changelog Best Practices](#changelog-best-practices)
 - [Unreleased](#unreleased)
+- [1.1.0](#110---2026-09-11)
 - [1.0.0](#100---2026-09-10)
 - [0.1.3](#013---2026-08-28)
 - [0.1.2](#012---2026-08-19)
@@ -24,6 +25,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use ISO 8601 date format: YYYY-MM-DD.
 
 ## [Unreleased]
+
+## [1.1.0] - 2026-09-11
+
+### Added
+
+- `pipelines/gold`: `1_canonical_genre_tree.json` nodes now carry an optional `side: "pop"` on a root's direct child, marking `the-music-tree-genre-kit`'s pop/core distinction — curated via a new `manual_canonical_genre_pop_side.csv` (root genre, its pop child, reason), validated the same way as the other manual CSVs. A root may have zero, one, or several pop children, but at least one direct child must remain "core" (unmarked). Regional tree export is unaffected. See `pipelines/gold/SCHEMA.md`, `DESIGN.md`.
+- `pipelines/gold`: populated `manual_canonical_genre_pop_side.csv` with the pop/core split for the six canonical roots affected by the recent wikidata electronic/hip-hop/disco-funk/blues-rock/reggae-dub/jazz restructuring.
+- `pipelines/gold`: new `export_regional_genre_tree` step exports a regional genre tree (`1_regional_genre_tree.json`, same shape as the canonical tree) from wikidata's `8_regional_hierarchy.parquet`, run automatically alongside the canonical export in `__main__.py`. The shared tree-building logic moved to `genre_tree_builder.py`, and `genre_tree_export.py`/`export_genre_tree` were renamed to `canonical_genre_tree_export.py`/`export_canonical_genre_tree` to disambiguate now that a second, sibling tree export exists.
+
+### Changed
+
+- `wikidata` Silver: split "ska" (Q54365) back out of the synthetic `LOCAL:ska-reggae-dub` grouping node into its own standalone canonical root, renaming the node back to `LOCAL:reggae-dub` ("Reggae/Dub") with just "reggae" and "dub music" as direct children (musically distinct in tempo/instrumentation despite the shared offbeat "skank" rhythmic tradition). Also added a new synthetic `LOCAL:pop-reggae` ("Pop reggae") node under `LOCAL:reggae-dub`, reparenting "ragga pop" (Q7282874) under it from its previous direct parent "reggae" — same pop/core crossover pattern as `LOCAL:pop-electronic`/`LOCAL:pop-hip-hop`/`LOCAL:pop-funk`. See `pipelines/gold/DESIGN.md#pop-core-genre-sides`.
+- `wikidata` Silver: split "jazz" (Q8341)'s 59 direct children into two new synthetic nodes, `LOCAL:pop-jazz` ("Pop jazz") and `LOCAL:core-jazz` ("Core jazz") — unlike electronic/hip-hop/funk/reggae, no Wikidata item was already labeled "pop jazz", so "smooth jazz" (Q831354) and "vocal jazz" (Q1530455) were hand-picked as jazz's pop/mainstream-crossover subgenres and moved under `LOCAL:pop-jazz`; the remaining 57 children moved under `LOCAL:core-jazz`. Same pop/core crossover pattern as `LOCAL:pop-electronic`/`LOCAL:pop-hip-hop`/`LOCAL:pop-funk`/`LOCAL:pop-reggae`. See `pipelines/gold/DESIGN.md#pop-core-genre-sides`.
 
 ## [1.0.0] - 2026-09-10
 
