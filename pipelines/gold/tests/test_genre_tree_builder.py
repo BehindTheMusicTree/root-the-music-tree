@@ -31,3 +31,30 @@ def test_build_genre_tree_handles_multiple_roots() -> None:
 
     root_names = {node["name"] for node in tree["tree"]}
     assert root_names == {"rock", "jazz"}
+
+
+def test_build_genre_tree_marks_pop_side_on_direct_child_only() -> None:
+    tree = build_genre_tree(_hierarchy(), pop_sides={"rock": {"pop rock"}})
+
+    rock = next(node for node in tree["tree"] if node["name"] == "rock")
+    pop_rock = next(child for child in rock["children"] if child["name"] == "pop rock")
+    punk_rock = next(child for child in rock["children"] if child["name"] == "punk rock")
+    assert pop_rock["side"] == "pop"
+    assert "side" not in punk_rock
+    assert "side" not in punk_rock["children"][0]  # hardcore punk, a grandchild
+
+
+def test_build_genre_tree_marks_multiple_pop_sides_on_same_root() -> None:
+    rows = [*TREE_ROWS, {"item_id": "Q6", "item_label": "soft rock", "parent_id": "Q1"}]
+    tree = build_genre_tree(pl.DataFrame(rows), pop_sides={"rock": {"pop rock", "soft rock"}})
+
+    rock = next(node for node in tree["tree"] if node["name"] == "rock")
+    sides = {child["name"]: child.get("side") for child in rock["children"]}
+    assert sides == {"punk rock": None, "pop rock": "pop", "soft rock": "pop"}
+
+
+def test_build_genre_tree_ignores_pop_side_for_root_without_entry() -> None:
+    tree = build_genre_tree(_hierarchy(), pop_sides={"rock": {"pop rock"}})
+
+    jazz = next(node for node in tree["tree"] if node["name"] == "jazz")
+    assert "side" not in jazz

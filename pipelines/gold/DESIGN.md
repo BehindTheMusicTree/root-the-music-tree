@@ -59,3 +59,25 @@ contradictory triage data:
 - `manual_accepted_non_genre_tags.csv`: `musicbrainz_genre_name` must not already match via
   `exact`/`music_suffix`, nor appear in `manual_genre_alias.csv` (can't be both a real alias and
   permanent noise).
+
+## Pop/core genre sides
+
+`the-music-tree-genre-kit` distinguishes a "pop" (crossover/mainstream) side from an implicit "core"
+side among a root genre's direct children (e.g. Electropop under Electronic) — a genre-kit/consumer
+concept with no Wikidata equivalent, so it can't be derived from `wikidata`'s Silver output. It's
+curated here in Gold, not Silver, following the same rationale as `manual_genre_alias.csv`: Silver
+stays a consumer-agnostic representation of Wikidata's genre graph, while Gold is where
+consumer-specific (genre-kit) curation belongs.
+
+`manual_canonical_genre_pop_side.csv` (see [SCHEMA.md](SCHEMA.md)) holds one row per (canonical root,
+pop child) pair — a root may have zero, one, or several pop children, but at least one direct child
+must remain "core" (unmarked). `canonical_genre_tree_export.py::_load_pop_sides` validates it the
+same way as the other manual CSVs — `ValueError` naming the CSV and offending value(s) for a
+blank/null required column, a duplicate `(root_genre_name, pop_child_genre_name)` row, a
+`root_genre_name` that isn't an actual canonical root, a `pop_child_genre_name` that isn't a direct
+child of that root, or a root whose *every* direct child is marked pop (no core side left) — then
+`genre_tree_builder.py::build_genre_tree` marks each matching direct child `"side": "pop"` in the
+exported tree. Everything else is implicitly "core" (unmarked), matching the genre-kit's own
+null-means-core convention, so `"side"` never appears with value `"core"`. Only the canonical tree
+gets this treatment — `1_regional_genre_tree.json`'s roots are geographic regions, not genres, so the
+pop/core distinction doesn't apply there.

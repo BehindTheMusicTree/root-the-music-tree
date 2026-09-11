@@ -17,7 +17,7 @@ Data dictionary for `gold`. See [README.md#pipeline](README.md#pipeline) for the
 
 ## 2. Outputs
 
-**`1_canonical_genre_tree.json`** — `{"tree": [<node>, ...]}`, one entry per root of `7_canonical_hierarchy`. A node is `{"name": str, "children": [<node>, ...]}`, recursive, matching `the-music-tree-genre-kit`'s `CriteriaTreeImportSerializer`/`TreeField` import shape exactly (validated against `src/gold/schemas/genre_tree.schema.json`).
+**`1_canonical_genre_tree.json`** — `{"tree": [<node>, ...]}`, one entry per root of `7_canonical_hierarchy`. A node is `{"name": str, "children": [<node>, ...], "side": "pop" (optional, direct children of a root only)}`, recursive, matching `the-music-tree-genre-kit`'s `CriteriaTreeImportSerializer`/`TreeField` import shape exactly (validated against `src/gold/schemas/genre_tree.schema.json`). `side` is only ever present with value `"pop"`, per `manual_canonical_genre_pop_side.csv` below — see [DESIGN.md](DESIGN.md).
 
 **`1_regional_genre_tree.json`** — same shape as `1_canonical_genre_tree.json` above (validated against the same `src/gold/schemas/genre_tree.schema.json`), but built from `8_regional_hierarchy` instead — one entry per regional/geographic root (e.g. "music of Cape Verde") with that region's genres nested underneath.
 
@@ -39,3 +39,5 @@ Committed alongside the code, colocated with `src/gold/genre_match.py` — see [
 **`manual_genre_alias.csv`**: `musicbrainz_genre_name, wikidata_genre_name, reason` — a real genre named differently by musicbrainz than by wikidata.
 
 **`manual_accepted_non_genre_tags.csv`**: `musicbrainz_genre_name, reason` — permanent non-genre folksonomy noise (e.g. `asmr`, `birdsong`) that should never resolve to a genre.
+
+**`manual_canonical_genre_pop_side.csv`** (colocated with `src/gold/canonical_genre_tree_export.py`): `root_genre_name, pop_child_genre_name, reason` — for a canonical root, which direct child(ren) are `the-music-tree-genre-kit`'s "pop" side; a root may have zero, one, or several pop children (one row each), but at least one direct child must remain "core".
