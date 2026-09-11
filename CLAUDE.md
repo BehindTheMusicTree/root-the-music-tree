@@ -54,10 +54,11 @@ Requires `uv` (no manual venv management — `uv sync` creates/updates `.venv` f
 
 ### Production deployment (cross-repo)
 
-Neither pipeline is deployed _from_ this repo — there is no CD workflow here. Both run **daily in production** via a `bronze_ingestion` Ansible role in the separate `infrastructure` repo:
+Neither pipeline (nor Gold) is deployed _from_ this repo — there is no CD workflow here. All three run **daily in production** via a `music_tree_pipelines` Ansible role in the separate `infrastructure` repo:
 
-- The role clones this repo onto the VPS (staging tracks `develop`, prod tracks `main`/release tags), and renders `pipelines/musicbrainz/.env` and `pipelines/wikidata/.env` directly into that checkout (Postgres connection to the on-VPS MusicBrainz mirror, `BRONZE_OUTPUT_DIR` under a per-env data dir).
-- A systemd `oneshot` service + daily timer (`bronze-ingestion-{env}`, e.g. `bronze-ingestion-staging`/`bronze-ingestion-prod`) runs `git pull --ff-only` on the pinned branch, then `uv sync --frozen`, then both pipelines in sequence (`uv run --package musicbrainz ...`, `uv run --package wikidata ...`), posting a Discord status embed on success/failure. Manual trigger: `systemctl start bronze-ingestion-<env>.service`.
+- The role clones this repo onto the VPS (staging tracks `develop`, prod tracks `main`/release tags), and renders `pipelines/musicbrainz/.env`, `pipelines/wikidata/.env`, and `pipelines/gold/.env` directly into that checkout (Postgres connection to the on-VPS MusicBrainz mirror, `BRONZE_OUTPUT_DIR`/`SILVER_OUTPUT_DIR`/`GOLD_OUTPUT_DIR` under a per-env data dir).
+- A systemd `oneshot` service + daily timer (`music-tree-pipelines-{env}`, e.g. `music-tree-pipelines-staging`/`music-tree-pipelines-prod`) runs `git pull --ff-only` on the pinned branch, then `uv sync --frozen`, then Bronze for both pipelines, Silver where enabled, then Gold once both Silver steps succeed, posting a Discord status embed on success/failure. Manual trigger: `systemctl start music-tree-pipelines-<env>.service`.
+- On **staging only**, once Gold succeeds, its exports are POSTed straight to `grow-the-music-tree-api`'s staging API (canonical genre tree, then songs) — see the `infrastructure` repo's `music-tree-pipelines/README.md` for the full grow-sync mechanism.
 - Each daily run pulls the pinned branch (`develop` for staging, `main` for prod) before running, so a merge here reaches staging/prod on the next daily run — matching the auto-deploy-on-push behavior Coolify apps already get on those same branches, not gated behind an `infrastructure` tag push.
 - No code changes are needed in this repo for that to work — it relies entirely on `common.env.load_pipeline_env()` resolving `.env` correctly regardless of invocation CWD.
 
